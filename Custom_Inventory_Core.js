@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 3: Strict Inventory Control v1.0
+ * @plugindesc Phase 3: Strict Inventory Control v1.02
  * @author Custom Build
  * * @help
  * Implements:
@@ -11,6 +11,8 @@
  * screens, limiting the columns to Weapons and Armor.
  * - Hides Standard Items from the Shop Buy list if the player already 
  * possesses them.
+ * - FIX: Added lazy initialization and Battle Start hooks for old saves.
+ * - FIX: Rerouted Shop filter to makeItemList to physically erase owned items.
  */
 
 (() => {
@@ -20,14 +22,12 @@
     // 1. Capacity & Post-Battle Restoration
     //=============================================================================
 
-    // Initialize the tracking array for used items
-    const _Game_Party_initialize = Game_Party.prototype.initialize;
-    Game_Party.prototype.initialize = function() {
-        _Game_Party_initialize.call(this);
+    const _Game_Party_onBattleStart = Game_Party.prototype.onBattleStart;
+    Game_Party.prototype.onBattleStart = function(advantageous) {
+        _Game_Party_onBattleStart.call(this, advantageous);
         this._itemsUsedPendingRestore = [];
     };
 
-    // Override: Force standard items (itypeId 1) to cap at 1
     const _Game_Party_maxItems = Game_Party.prototype.maxItems;
     Game_Party.prototype.maxItems = function(item) {
         if (DataManager.isItem(item) && item.itypeId === 1) {
@@ -36,16 +36,17 @@
         return _Game_Party_maxItems.call(this, item);
     };
 
-    // Track standard items as they are consumed
     const _Game_Battler_consumeItem = Game_Battler.prototype.consumeItem;
     Game_Battler.prototype.consumeItem = function(item) {
         if (DataManager.isItem(item) && item.itypeId === 1) {
+            if (!$gameParty._itemsUsedPendingRestore) {
+                $gameParty._itemsUsedPendingRestore = [];
+            }
             $gameParty._itemsUsedPendingRestore.push(item);
         }
         _Game_Battler_consumeItem.call(this, item);
     };
 
-    // Restore all tracked items at the end of battle
     const _Game_Party_onBattleEnd = Game_Party.prototype.onBattleEnd;
     Game_Party.prototype.onBattleEnd = function() {
         _Game_Party_onBattleEnd.call(this);
@@ -61,15 +62,22 @@
     // 2. Shop & Menu Restrictions
     //=============================================================================
 
-    // Override: Hide items from the Buy list if they are already owned
-    const _Window_ShopBuy_includes = Window_ShopBuy.prototype.includes;
-    Window_ShopBuy.prototype.includes = function(item) {
-        if (DataManager.isItem(item) && item.itypeId === 1) {
-            if ($gameParty.hasItem(item, true)) {
-                return false; 
+    // Override: Intercept the raw shop data generation to erase owned standard items
+    const _Window_ShopBuy_makeItemList = Window_ShopBuy.prototype.makeItemList;
+    Window_ShopBuy.prototype.makeItemList = function() {
+        this._data = [];
+        this._price = [];
+        for (const goods of this._shopGoods) {
+            const item = this.goodsToItem(goods);
+            if (item) {
+                // If it is a Standard Item and the player owns it, skip adding it!
+                if (DataManager.isItem(item) && item.itypeId === 1 && $gameParty.hasItem(item, true)) {
+                    continue; 
+                }
+                this._data.push(item);
+                this._price.push(goods[2] === 0 ? item.price : goods[3]);
             }
         }
-        return _Window_ShopBuy_includes.call(this, item);
     };
 
     // Override: Remove "Items" and "Key Items" from the shop category selection
