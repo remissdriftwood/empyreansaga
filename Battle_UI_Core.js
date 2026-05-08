@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 2: Battle UI & Sprite Architecture v1.24.
+ * @plugindesc Phase 2: Battle UI & Sprite Architecture v1.31.
  * @author Custom Build
  * * @help
  * Implements:
@@ -21,6 +21,11 @@
  * - FIX: 1-Bit Pixel Crusher (Destroys Canvas Anti-Aliasing via Alpha Thresholding).
  * - UPGRADE: Solid 2px Retro Outline Density (Fills all diagonal corners).
  * - NEW: Battle Log Assassination & Top-Screen Action Banner.
+ * - FIX: Total Render Assassination (Nullifies stubborn MZ background rects).
+ * - FIX: Healing Color mapped to Index 20.
+ * - FIX: Neutralized hardcoded Red critical & collapse flashes (Pure White).
+ * - FIX: Zeroed Damage Popup Offsets (Perfect Horizontal Centering).
+ * - FIX: Actor Entry March (Vertical tween using Index 3 "guard" animation).
  */
 
 (() => {
@@ -40,6 +45,21 @@
         const y = 230; 
         
         this.setHome(x, y);
+    };
+
+    Sprite_Actor.prototype.moveToStartPosition = function() {
+        this.startMove(0, 200, 0); 
+    };
+
+    Sprite_Actor.prototype.setupEntryMotion = function() {
+        if (this._actor && this._actor.canMove()) {
+            this.startMotion("guard"); // Calls Index 3 from the SV Sprite Sheet
+            this.startMove(0, 0, 30);  
+        }
+    };
+
+    Sprite_Actor.prototype.damageOffsetX = function() {
+        return 0; 
     };
 
     Sprite_Actor.prototype.stepForward = function() {
@@ -353,19 +373,24 @@
     };
 
     //=============================================================================
-    // 7. Monochrome Damage Popups (1-Bit Pixel Crusher)
+    // 7. Monochrome Damage Popups (1-Bit Pixel Crusher & Crit Flash)
     //=============================================================================
 
     Sprite_Damage.prototype.damageFontSize = function() { return 16; };
 
     Sprite_Damage.prototype.damageColor = function() {
         if (this._colorType === 1 || this._colorType === 2) {
-            return ColorManager.textColor(25); // Healing
+            return ColorManager.textColor(20); 
         }
-        return "#000000"; // Black Text
+        return "#000000"; 
     };
 
     Sprite_Damage.prototype.damageOutlineColor = function() { return "#ffffff"; };
+
+    Sprite_Damage.prototype.setupCriticalEffect = function() {
+        this._flashColor = [255, 255, 255, 160]; 
+        this._flashDuration = 60;
+    };
 
     const create1BitTextMask = function(bmpInfo, text, w, h, color) {
         const tempBmp = new Bitmap(w, h);
@@ -477,7 +502,6 @@
     // 8. Battle Log Assassination & Action Banner Integration
     //=============================================================================
 
-    // Define the custom Action Banner Window
     function Window_BattleSkillBanner() {
         this.initialize(...arguments);
     }
@@ -486,8 +510,6 @@
 
     Window_BattleSkillBanner.prototype.initialize = function(rect) {
         Window_Base.prototype.initialize.call(this, rect);
-        
-        // Match the solid 1-bit aesthetics of the rest of the UI
         this.frameVisible = true;
         this.opacity = 255;
         this.backOpacity = 255;
@@ -501,7 +523,6 @@
         this.show();
     };
 
-    // Inject the Banner into the Battle Scene
     const _Scene_Battle_createAllWindows_banner = Scene_Battle.prototype.createAllWindows;
     Scene_Battle.prototype.createAllWindows = function() {
         _Scene_Battle_createAllWindows_banner.call(this);
@@ -512,35 +533,41 @@
         
         this._skillBannerWindow = new Window_BattleSkillBanner(rect);
         this.addWindow(this._skillBannerWindow);
-        
-        // Pass a reference down to the log so its queue can control the banner
         this._logWindow._skillBanner = this._skillBannerWindow;
     };
-
-    // Completely blind the original Battle Log but keep its pacing logic alive
+    
     const _Window_BattleLog_initialize = Window_BattleLog.prototype.initialize;
     Window_BattleLog.prototype.initialize = function(rect) {
         _Window_BattleLog_initialize.call(this, rect);
         this.opacity = 0;
+        this.backOpacity = 0;
         this.contentsOpacity = 0;
+        this.frameVisible = false;
     };
-    Window_BattleLog.prototype.createBackBitmap = function() {};
-    Window_BattleLog.prototype.createBackSprite = function() {};
 
-    // Intercept the Action Display method. Instead of text, queue the Banner!
+    Window_BattleLog.prototype.drawBackground = function() {};
+    Window_BattleLog.prototype.drawLineText = function(index) {};
+
+    const _Window_BattleLog_update = Window_BattleLog.prototype.update;
+    Window_BattleLog.prototype.update = function() {
+        _Window_BattleLog_update.call(this);
+        this.opacity = 0;
+        this.backOpacity = 0;
+        this.contentsOpacity = 0;
+        this.frameVisible = false;
+    };
+
     Window_BattleLog.prototype.displayAction = function(subject, item) {
         this.push("showBanner", item.name);
-        this.push("wait"); // Preserves the engine's default combat pacing
+        this.push("wait"); 
     };
 
-    // Queue method to trigger the banner exactly when the animation starts
     Window_BattleLog.prototype.showBanner = function(name) {
         if (this._skillBanner) {
             this._skillBanner.showSkill(name);
         }
     };
 
-    // Queue method to hide the banner exactly when the action resolves
     const _Window_BattleLog_endAction = Window_BattleLog.prototype.endAction;
     Window_BattleLog.prototype.endAction = function(subject) {
         this.push("hideBanner");
@@ -553,13 +580,23 @@
         }
     };
 
-    // Failsafe: If the log is ever forcefully cleared, hide the banner too
     const _Window_BattleLog_clear = Window_BattleLog.prototype.clear;
     Window_BattleLog.prototype.clear = function() {
         _Window_BattleLog_clear.call(this);
         if (this._skillBanner) {
             this._skillBanner.hide();
         }
+    };
+
+    //=============================================================================
+    // 9. Monochrome Enemy Collapse (Neutralize Red Death Flash)
+    //=============================================================================
+
+    const _Sprite_Enemy_updateCollapse = Sprite_Enemy.prototype.updateCollapse;
+    Sprite_Enemy.prototype.updateCollapse = function() {
+        this.blendMode = 1; // ADD
+        this.setBlendColor([255, 255, 255, 128]); // Changed from Red to Pure White
+        this.opacity *= this._effectDuration / (this._effectDuration + 1);
     };
 
 })();
