@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 2: Battle UI & Sprite Architecture v1.31.
+ * @plugindesc Phase 2: Battle UI & Sprite Architecture v1.33.
  * @author Custom Build
  * * @help
  * Implements:
@@ -26,6 +26,8 @@
  * - FIX: Neutralized hardcoded Red critical & collapse flashes (Pure White).
  * - FIX: Zeroed Damage Popup Offsets (Perfect Horizontal Centering).
  * - FIX: Actor Entry March (Vertical tween using Index 3 "guard" animation).
+ * - NEW: VX Ace Retro Animation Hijack (4-frame 1-bit sprite strips via Notetags).
+ * - FIX: Asynchronous Loading Glitch (Nullified uncropped full-sheet flashes).
  */
 
 (() => {
@@ -53,7 +55,7 @@
 
     Sprite_Actor.prototype.setupEntryMotion = function() {
         if (this._actor && this._actor.canMove()) {
-            this.startMotion("guard"); // Calls Index 3 from the SV Sprite Sheet
+            this.startMotion("guard"); 
             this.startMove(0, 0, 30);  
         }
     };
@@ -557,6 +559,12 @@
         this.frameVisible = false;
     };
 
+    const _Window_BattleLog_startAction = Window_BattleLog.prototype.startAction;
+    Window_BattleLog.prototype.startAction = function(subject, action, targets) {
+        this._currentActionItem = action.item(); 
+        _Window_BattleLog_startAction.call(this, subject, action, targets);
+    };
+
     Window_BattleLog.prototype.displayAction = function(subject, item) {
         this.push("showBanner", item.name);
         this.push("wait"); 
@@ -595,8 +603,136 @@
     const _Sprite_Enemy_updateCollapse = Sprite_Enemy.prototype.updateCollapse;
     Sprite_Enemy.prototype.updateCollapse = function() {
         this.blendMode = 1; // ADD
-        this.setBlendColor([255, 255, 255, 128]); // Changed from Red to Pure White
+        this.setBlendColor([255, 255, 255, 128]); 
         this.opacity *= this._effectDuration / (this._effectDuration + 1);
+    };
+
+    //=============================================================================
+    // 10. Custom Retro 4-Frame Animations (VX Ace Timing Hijack)
+    //=============================================================================
+
+    function Sprite_RetroAnim() {
+        this.initialize(...arguments);
+    }
+    Sprite_RetroAnim.prototype = Object.create(Sprite.prototype);
+    Sprite_RetroAnim.prototype.constructor = Sprite_RetroAnim;
+
+    Sprite_RetroAnim.prototype.initialize = function(targetSprite, animName) {
+        Sprite.prototype.initialize.call(this);
+        this._targetSprite = targetSprite;
+        
+        this.bitmap = ImageManager.loadSystem(animName);
+        this.bitmap.smooth = false; 
+        
+        this.anchor.x = 0.5;
+        this.anchor.y = 0.5; 
+        this.z = 8; 
+        
+        // Hide the sprite while it loads to prevent the "uncropped full-sheet flash"
+        this.visible = false; 
+        
+        this._tick = 0;
+        this._frameIndex = 0;
+        this._maxFrames = 4;
+        this._ticksPerFrame = 4; 
+        this._isPlaying = true;
+    };
+
+    Sprite_RetroAnim.prototype.update = function() {
+        Sprite.prototype.update.call(this);
+        if (!this._isPlaying) return;
+        if (!this.bitmap || !this.bitmap.isReady()) return; 
+        
+        // The exact millisecond the image loads, apply the crop math BEFORE revealing it
+        if (!this.visible) {
+            this.visible = true;
+        }
+        
+        this.updatePosition();
+        this.updateFrame();
+        
+        this._tick++;
+        if (this._tick >= this._ticksPerFrame) {
+            this._tick = 0;
+            this._frameIndex++;
+            if (this._frameIndex >= this._maxFrames) {
+                this._isPlaying = false;
+                if (this.parent) this.parent.removeChild(this);
+            }
+        }
+    };
+
+    Sprite_RetroAnim.prototype.updatePosition = function() {
+        if (this._targetSprite) {
+            this.x = this._targetSprite.x;
+            
+            let yOffset = 0;
+            if (this._targetSprite instanceof Sprite_Actor) {
+                yOffset = 24; 
+            } else if (this._targetSprite.bitmap) {
+                yOffset = this._targetSprite.bitmap.height / 2; 
+            } else {
+                yOffset = 32; 
+            }
+            this.y = this._targetSprite.y - yOffset;
+        }
+    };
+
+    Sprite_RetroAnim.prototype.updateFrame = function() {
+        const frameW = this.bitmap.width / 4;
+        const frameH = this.bitmap.height;
+        this.setFrame(this._frameIndex * frameW, 0, frameW, frameH);
+    };
+
+    Sprite_RetroAnim.prototype.isPlaying = function() {
+        return this._isPlaying;
+    };
+
+    const _Spriteset_Base_initialize = Spriteset_Base.prototype.initialize;
+    Spriteset_Base.prototype.initialize = function() {
+        this._retroAnimations = [];
+        _Spriteset_Base_initialize.call(this);
+    };
+
+    const _Spriteset_Base_update = Spriteset_Base.prototype.update;
+    Spriteset_Base.prototype.update = function() {
+        _Spriteset_Base_update.call(this);
+        this._retroAnimations = this._retroAnimations.filter(sprite => sprite.isPlaying());
+    };
+
+    const _Spriteset_Base_isAnimationPlaying = Spriteset_Base.prototype.isAnimationPlaying;
+    Spriteset_Base.prototype.isAnimationPlaying = function() {
+        return _Spriteset_Base_isAnimationPlaying.call(this) || this._retroAnimations.length > 0;
+    };
+
+    const _Window_BattleLog_showAnimation = Window_BattleLog.prototype.showAnimation;
+    Window_BattleLog.prototype.showAnimation = function(subject, targets, animationId) {
+        const item = this._currentActionItem;
+        
+        if (item && item.meta && item.meta.Anim) {
+            const tagData = item.meta.Anim.split(",");
+            const animName = String(tagData[0]).trim();
+            const soundName = tagData.length > 1 ? String(tagData[1]).trim() : null;
+            
+            if (this._spriteset) {
+                let soundPlayed = false;
+                targets.forEach(target => {
+                    const targetSprite = this._spriteset.findTargetSprite(target);
+                    if (targetSprite && targetSprite.parent) {
+                        const animSprite = new Sprite_RetroAnim(targetSprite, animName);
+                        targetSprite.parent.addChild(animSprite);
+                        this._spriteset._retroAnimations.push(animSprite);
+                        
+                        if (soundName && !soundPlayed) {
+                            AudioManager.playSe({ name: soundName, volume: 90, pitch: 100, pan: 0 });
+                            soundPlayed = true; 
+                        }
+                    }
+                });
+            }
+        } else {
+            _Window_BattleLog_showAnimation.call(this, subject, targets, animationId);
+        }
     };
 
 })();
