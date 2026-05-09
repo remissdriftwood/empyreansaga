@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 3: Tactical AI Core v1.15
+ * @plugindesc Phase 3: Tactical AI Core v1.17
  * @author Custom Build
  * * @help
  * Implements:
@@ -11,6 +11,8 @@
  * - <CEB_SmartHeal: SkillID, Threshold%>: Smart validation and targeting.
  * - Embedded UI Patch: Arbitrary 1-bit text popups for status effects.
  * - FIX: Corrected Heal Text to match Phase 2 UI (ColorManager.textColor(20)).
+ * - FIX: Decreased popup vertical velocity for a much less violent bounce.
+ * - FIX: Zeroed the yOffset so custom popups center exactly like native ones.
  */
 
 (() => {
@@ -330,9 +332,9 @@
         }
         sprite.bitmap.blt(centerBmp, 0, 0, canvasW, canvasH, 0, 0);
         
-        sprite.yOffset = -32; 
+        sprite.yOffset = 0; 
         sprite.ry = 0;
-        sprite.dy = -10; 
+        sprite.dy = -5; 
     };
 
 })();

@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 2: Battle UI & Sprite Architecture v1.40.
+ * @plugindesc Phase 2: Battle UI & Sprite Architecture v1.41.
  * @author Custom Build
  * * @help
  * Implements:
@@ -33,6 +33,7 @@
  * - FIX: Changed actor.classId() to actor._classId to prevent TypeErrors.
  * - FIX: Re-linked Ammo Context UI to trigger off Weapon Type ID 8 (Guns).
  * - UPGRADE: Ammo Context UI maps real Weapon Name and Icon from equipment.
+ * - FIX: Hardcoded 6/6 dummy data permanently replaced with live ammo arrays.
  */
 
 (() => {
@@ -224,28 +225,40 @@
     Window_BattleContext.prototype.refresh = function(actor) {
         this.contents.clear();
         if (!actor) return;
-
-        // Fetch equipped guns directly from the actor's weapons array
+        
         const guns = actor.weapons().filter(weapon => weapon && weapon.wtypeId === 8);
         const hasGun = guns.length > 0;
-        
         const isFarmer = actor._classId === 4; 
         const isCultivator = actor._classId === 6; 
 
         let lines = 0;
         let drawMode = "none";
 
-        // Map real weapon data and inject dummy ammo amounts for testing
-        const gunData = guns.map(weapon => {
-            return {
-                name: weapon.name,
-                iconIndex: weapon.iconIndex,
-                currentAmmo: 6, // PHASE 4 TODO: Replace with actor's true ammo property
-                maxAmmo: 6      // PHASE 4 TODO: Replace with weapon's true max ammo tag
-            };
-        });
+        // Live Weapon/Ammo Mapping directly bound to Equip Slots 0 and 1
+        let liveAmmoData = [];
+        if (hasGun) {
+            for (let i = 0; i <= 1; i++) {
+                const weapon = actor.equips()[i];
+                if (weapon && weapon.wtypeId === 8) {
+                    let maxAmmo = 0;
+                    if (weapon.note) {
+                        const match = weapon.note.match(/<max ammo:\s*(\d+)>/i);
+                        if (match) maxAmmo = parseInt(match[1]);
+                    }
+                    
+                    const currentAmmo = (actor._ammo && actor._ammo[i] !== undefined) ? actor._ammo[i] : maxAmmo;
+                    
+                    liveAmmoData.push({
+                        name: weapon.name,
+                        iconIndex: weapon.iconIndex,
+                        currentAmmo: currentAmmo,
+                        maxAmmo: maxAmmo
+                    });
+                }
+            }
+        }
 
-        // Remaining Phase 4 Dummy Data
+        // Phase 5 Dummy Data Retention
         const dummyElement = { name: "Fire", iconIndex: 97 };
         const dummySeeds = [
             { name: "Brandywine", turns: 3 },
@@ -255,7 +268,7 @@
 
         if (hasGun) {
             drawMode = "ammo";
-            lines = gunData.length || 1;
+            lines = liveAmmoData.length || 1;
         } else if (isCultivator) {
             drawMode = "cultivator";
             lines = 1;
@@ -281,12 +294,12 @@
 
         // Execution Branches
         if (drawMode === "ammo") {
-            for (let i = 0; i < gunData.length; i++) {
+            for (let i = 0; i < liveAmmoData.length; i++) {
                 const y = i * this.lineHeight();
-                this.drawIcon(gunData[i].iconIndex, 0, y + 2);
+                this.drawIcon(liveAmmoData[i].iconIndex, 0, y + 2);
                 this.changeTextColor(ColorManager.normalColor());
-                this.drawText(gunData[i].name, 36, y, this.innerWidth - 80, "left");
-                this.drawText(`${gunData[i].currentAmmo}/${gunData[i].maxAmmo}`, 0, y, this.innerWidth - 4, "right");
+                this.drawText(liveAmmoData[i].name, 36, y, this.innerWidth - 80, "left");
+                this.drawText(`${liveAmmoData[i].currentAmmo}/${liveAmmoData[i].maxAmmo}`, 0, y, this.innerWidth - 4, "right");
             }
         } else if (drawMode === "cultivator") {
             this.drawIcon(dummyElement.iconIndex, 0, 2);
