@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 2: Battle UI & Sprite Architecture v1.41.
+ * @plugindesc Phase 2: Battle UI & Sprite Architecture v1.45.
  * @author Custom Build
  * * @help
  * Implements:
@@ -34,10 +34,28 @@
  * - FIX: Re-linked Ammo Context UI to trigger off Weapon Type ID 8 (Guns).
  * - UPGRADE: Ammo Context UI maps real Weapon Name and Icon from equipment.
  * - FIX: Hardcoded 6/6 dummy data permanently replaced with live ammo arrays.
+ * - NEW: Visual Grid Enemy Targeting (MenuCursor.png, Spatial Navigation).
+ * - UPGRADE: Action Banner space shared with Target Enemy Name window.
+ * - NEW: AoE Targeting Bypass & Mid-Battle Grid Recalculations.
+ * - FIX: Help Window dynamically hides during targeting to prevent overlap.
+ * - FIX: Destroys phantom native Window_BattleEnemy cursor rect collision.
+ * - FIX: Skill/Item cursor overrides Phase 1 to remain visible while targeting.
+ * - FIX: Cursor mathematically calculates and initializes on top-leftmost grid enemy.
+ * - FIX: Adjusted targeting cursor Y-buffer to -16 for perfect alignment.
  */
 
 (() => {
     'use strict';
+
+    //=============================================================================
+    // 0. Configuration & Targeting Constants
+    //=============================================================================
+    
+    const TARGETING_CONFIG = {
+        BUFFER_X: -4,
+        BUFFER_Y: -12, // Adjusted to -12
+        NAME_COLOR_INDEX: 10 
+    };
 
     //=============================================================================
     // 1. Rear-View Sprite Grid & SV Animation Overrides
@@ -140,6 +158,9 @@
             let h = item.h;
             let placed = false;
 
+            e._gridW = w;
+            e._gridH = h;
+
             let preferredX = [];
             if (w === 1) {
                 preferredX = [1, 2, 0, 3]; 
@@ -170,6 +191,8 @@
                             }
                         }
                         
+                        e._gridX = x;
+                        e._gridY = y;
                         e._screenX = Math.round(START_X + (x * CELL_W) + (w * CELL_W / 2.0));
                         e._screenY = Math.round(START_Y + (y * CELL_H) + (h * CELL_H));
                         placed = true;
@@ -183,6 +206,18 @@
                 e.hide();
             }
         });
+    };
+
+    const _Game_Enemy_appear = Game_Enemy.prototype.appear;
+    Game_Enemy.prototype.appear = function() {
+        _Game_Enemy_appear.call(this);
+        $gameTroop.arrangeEnemyGrid();
+    };
+
+    const _Game_Enemy_transform = Game_Enemy.prototype.transform;
+    Game_Enemy.prototype.transform = function(enemyId) {
+        _Game_Enemy_transform.call(this, enemyId);
+        $gameTroop.arrangeEnemyGrid();
     };
 
     //=============================================================================
@@ -234,7 +269,6 @@
         let lines = 0;
         let drawMode = "none";
 
-        // Live Weapon/Ammo Mapping directly bound to Equip Slots 0 and 1
         let liveAmmoData = [];
         if (hasGun) {
             for (let i = 0; i <= 1; i++) {
@@ -258,7 +292,6 @@
             }
         }
 
-        // Phase 5 Dummy Data Retention
         const dummyElement = { name: "Fire", iconIndex: 97 };
         const dummySeeds = [
             { name: "Brandywine", turns: 3 },
@@ -292,7 +325,6 @@
 
         this.resetFontSettings();
 
-        // Execution Branches
         if (drawMode === "ammo") {
             for (let i = 0; i < liveAmmoData.length; i++) {
                 const y = i * this.lineHeight();
@@ -354,7 +386,6 @@
 
     Scene_Battle.prototype.contextWindowRect = function() {
         const ww = Graphics.boxWidth - 352;
-        // Start initialization at 1-line height; the refresh function handles scaling it dynamically
         const wh = this.calcWindowHeight(1, false); 
         const wx = 352;
         const wy = this.actorCommandWindowRect().y - wh; 
@@ -448,7 +479,6 @@
         _Scene_Battle_startActorCommandSelection.call(this);
         const actor = BattleManager.actor();
         if (actor) {
-            // Trigger dynamic data fetches and height adjustments right before opening
             this._mpInfoWindow.refresh(actor);
             this._contextWindow.refresh(actor);
             
@@ -458,7 +488,6 @@
                 this._mpInfoWindow.hide();
             }
 
-            // Only show context window if the actor has a Gun or belongs to Farmer/Cultivator class
             const hasGun = actor.weapons().some(weapon => weapon && weapon.wtypeId === 8);
             if (hasGun || actor._classId === 4 || actor._classId === 6) {
                 this._contextWindow.show(); 
@@ -869,6 +898,252 @@
                 const index = $gameParty.battleMembers().indexOf(this);
                 if (index >= 0) statusWindow.redrawItem(index);
             }
+        }
+    };
+
+    //=============================================================================
+    // 12. Visual Grid Enemy Targeting
+    //=============================================================================
+
+    function Sprite_GridTargetCursor() {
+        this.initialize(...arguments);
+    }
+    Sprite_GridTargetCursor.prototype = Object.create(Sprite.prototype);
+    Sprite_GridTargetCursor.prototype.constructor = Sprite_GridTargetCursor;
+
+    Sprite_GridTargetCursor.prototype.initialize = function() {
+        Sprite.prototype.initialize.call(this);
+        this.bitmap = ImageManager.loadSystem("MenuCursor");
+        this.z = 200;
+        this.visible = false;
+        this._targetEnemy = null;
+    };
+
+    Sprite_GridTargetCursor.prototype.setTarget = function(enemy) {
+        this._targetEnemy = enemy;
+        if (this._targetEnemy) this.updatePosition();
+    };
+
+    Sprite_GridTargetCursor.prototype.update = function() {
+        Sprite.prototype.update.call(this);
+        if (this.visible && this._targetEnemy) this.updatePosition();
+    };
+
+    Sprite_GridTargetCursor.prototype.updatePosition = function() {
+        const CELL_W = 64;
+        const CELL_H = 64;
+        const leftX = this._targetEnemy._screenX - (CELL_W * this._targetEnemy._gridW / 2.0);
+        const topY = this._targetEnemy._screenY - (CELL_H * this._targetEnemy._gridH);
+        
+        this.x = leftX + TARGETING_CONFIG.BUFFER_X;
+        this.y = topY + TARGETING_CONFIG.BUFFER_Y;
+    };
+
+    function Window_TargetEnemyName() {
+        this.initialize(...arguments);
+    }
+    Window_TargetEnemyName.prototype = Object.create(Window_Base.prototype);
+    Window_TargetEnemyName.prototype.constructor = Window_TargetEnemyName;
+
+    Window_TargetEnemyName.prototype.initialize = function(rect) {
+        Window_Base.prototype.initialize.call(this, rect);
+        this.frameVisible = true;
+        this.opacity = 255;
+        this.backOpacity = 255;
+        this.hide();
+    };
+    Window_TargetEnemyName.prototype.drawBackgroundRect = function() {};
+
+    Window_TargetEnemyName.prototype.setEnemy = function(enemy) {
+        this.contents.clear();
+        if (!enemy) return;
+        this.changeTextColor(ColorManager.textColor(TARGETING_CONFIG.NAME_COLOR_INDEX));
+        this.drawText(enemy.name(), 0, 0, this.innerWidth, "center");
+    };
+
+    const _Window_BattleEnemy_initialize = Window_BattleEnemy.prototype.initialize;
+    Window_BattleEnemy.prototype.initialize = function(rect) {
+        _Window_BattleEnemy_initialize.call(this, rect);
+        this.x = Graphics.boxWidth; 
+        this.opacity = 0;
+        this.visible = false;
+    };
+
+    // Neutralize native MZ invisible selection box
+    Window_BattleEnemy.prototype.updateCursor = function() {};
+    Window_BattleEnemy.prototype.drawItem = function(index) {};
+
+    const _Window_BattleEnemy_select = Window_BattleEnemy.prototype.select;
+    Window_BattleEnemy.prototype.select = function(index) {
+        _Window_BattleEnemy_select.call(this, index);
+        this.updateCustomUI();
+    };
+
+    Window_BattleEnemy.prototype.updateCustomUI = function() {
+        if (!this._customGridCursor || !this._nameWindow) return;
+        const enemy = this.enemy();
+        if (enemy) {
+            this._customGridCursor.setTarget(enemy);
+            this._customGridCursor.visible = true;
+            this._nameWindow.setEnemy(enemy);
+            this._nameWindow.show();
+        }
+    };
+
+    Window_BattleEnemy.prototype.getEnemiesInColumn = function(colX) {
+        return $gameTroop.aliveMembers().filter(e => colX >= e._gridX && colX < (e._gridX + e._gridW));
+    };
+
+    Window_BattleEnemy.prototype.cursorDown = function(wrap) {
+        this.processDirUpDown(1);
+    };
+
+    Window_BattleEnemy.prototype.cursorUp = function(wrap) {
+        this.processDirUpDown(-1);
+    };
+
+    Window_BattleEnemy.prototype.processDirUpDown = function(dirY) {
+        const ce = this.enemy();
+        if (!ce) return;
+        let colEnemies = this.getEnemiesInColumn(ce._gridX);
+        colEnemies = colEnemies.filter(e => e !== ce);
+        if (colEnemies.length > 0) {
+            SoundManager.playCursor();
+            this.select($gameTroop.aliveMembers().indexOf(colEnemies[0]));
+        }
+    };
+
+    Window_BattleEnemy.prototype.cursorRight = function(wrap) {
+        this.processDirLeftRight(1);
+    };
+
+    Window_BattleEnemy.prototype.cursorLeft = function(wrap) {
+        this.processDirLeftRight(-1);
+    };
+
+    Window_BattleEnemy.prototype.processDirLeftRight = function(dirX) {
+        const ce = this.enemy();
+        if (!ce) return;
+        let currentX = ce._gridX;
+        let currentY = ce._gridY;
+
+        for (let offset = 1; offset <= 3; offset++) {
+            let checkX = (currentX + (offset * dirX));
+            if (checkX > 3) checkX -= 4; 
+            if (checkX < 0) checkX += 4; 
+
+            let colEnemies = this.getEnemiesInColumn(checkX);
+            colEnemies = colEnemies.filter(e => e !== ce);
+            if (colEnemies.length === 0) continue;
+
+            SoundManager.playCursor();
+            let newTarget = colEnemies.find(e => e._gridY === currentY) || colEnemies[0];
+            this.select($gameTroop.aliveMembers().indexOf(newTarget));
+            break;
+        }
+    };
+
+    const _Window_BattleEnemy_hide = Window_BattleEnemy.prototype.hide;
+    Window_BattleEnemy.prototype.hide = function() {
+        if (this._customGridCursor) this._customGridCursor.visible = false;
+        if (this._nameWindow) this._nameWindow.hide();
+        _Window_BattleEnemy_hide.call(this);
+    };
+
+    const _Scene_Battle_createEnemyWindow = Scene_Battle.prototype.createEnemyWindow;
+    Scene_Battle.prototype.createEnemyWindow = function() {
+        _Scene_Battle_createEnemyWindow.call(this);
+        
+        this._customGridCursor = new Sprite_GridTargetCursor();
+        this._spriteset.addChild(this._customGridCursor);
+        
+        const ww = Graphics.boxWidth;
+        const wh = this.calcWindowHeight(1, false);
+        const rect = new Rectangle(0, 0, ww, wh);
+        this._enemyNameWindow = new Window_TargetEnemyName(rect);
+        this.addWindow(this._enemyNameWindow);
+
+        this._enemyWindow._customGridCursor = this._customGridCursor;
+        this._enemyWindow._nameWindow = this._enemyNameWindow;
+    };
+
+    // Override Scene flow to manage Help Window and Sub-Windows during Targeting
+    Scene_Battle.prototype.selectEnemySelection = function() {
+        const action = BattleManager.inputtingAction();
+        
+        // Instant AoE Bypass
+        if (action && action.isForAll()) {
+            $gameParty.select(null);
+            this.onEnemyOk();
+            return;
+        }
+
+        this._enemyWindow.refresh();
+        this._enemyWindow.show();
+        this._enemyWindow.activate();
+
+        // Calculate geometric top-leftmost living enemy instead of arbitrary Array Index 0
+        const members = $gameTroop.aliveMembers();
+        let bestIndex = 0;
+        if (members.length > 0) {
+            let bestX = 999;
+            let bestY = 999;
+            members.forEach((enemy, i) => {
+                if (enemy._gridX < bestX || (enemy._gridX === bestX && enemy._gridY < bestY)) {
+                    bestX = enemy._gridX;
+                    bestY = enemy._gridY;
+                    bestIndex = i;
+                }
+            });
+        }
+        this._enemyWindow.select(bestIndex);
+
+        if (this._helpWindow) this._helpWindow.hide();
+    };
+
+    const _Scene_Battle_onSelectAction = Scene_Battle.prototype.onSelectAction;
+    Scene_Battle.prototype.onSelectAction = function() {
+        const action = BattleManager.inputtingAction();
+        if (action && action.needsSelection() && action.isForOpponent()) {
+            // Bypass hiding skill/item window natively here so they persist during targeting
+            this.selectEnemySelection();
+        } else {
+            _Scene_Battle_onSelectAction.call(this);
+        }
+    };
+
+    const _Scene_Battle_onEnemyCancel = Scene_Battle.prototype.onEnemyCancel;
+    Scene_Battle.prototype.onEnemyCancel = function() {
+        _Scene_Battle_onEnemyCancel.call(this);
+        if (this._helpWindow) this._helpWindow.show();
+    };
+
+    const _Scene_Battle_onEnemyOk = Scene_Battle.prototype.onEnemyOk;
+    Scene_Battle.prototype.onEnemyOk = function() {
+        _Scene_Battle_onEnemyOk.call(this);
+        if (this._skillWindow) this._skillWindow.hide();
+        if (this._itemWindow) this._itemWindow.hide();
+        if (this._helpWindow) this._helpWindow.show();
+    };
+
+    //=============================================================================
+    // 13. Sub-Window Cursor Visibility Persistence Override
+    //=============================================================================
+
+    // Forces the cursor to remain visible when deactivated during the targeting phase
+    const _Window_SkillList_refreshCursor = Window_SkillList.prototype.refreshCursor;
+    Window_SkillList.prototype.refreshCursor = function() {
+        _Window_SkillList_refreshCursor.call(this);
+        if (!this.active && this.index() >= 0 && $gameParty.inBattle() && this.visible) {
+            if (this._cursorSprite) this._cursorSprite.visible = true;
+        }
+    };
+
+    const _Window_ItemList_refreshCursor = Window_ItemList.prototype.refreshCursor;
+    Window_ItemList.prototype.refreshCursor = function() {
+        _Window_ItemList_refreshCursor.call(this);
+        if (!this.active && this.index() >= 0 && $gameParty.inBattle() && this.visible) {
+            if (this._cursorSprite) this._cursorSprite.visible = true;
         }
     };
 
