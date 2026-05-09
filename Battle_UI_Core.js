@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 2: Battle UI & Sprite Architecture v1.33.
+ * @plugindesc Phase 2: Battle UI & Sprite Architecture v1.40.
  * @author Custom Build
  * * @help
  * Implements:
@@ -28,6 +28,11 @@
  * - FIX: Actor Entry March (Vertical tween using Index 3 "guard" animation).
  * - NEW: VX Ace Retro Animation Hijack (4-frame 1-bit sprite strips via Notetags).
  * - FIX: Asynchronous Loading Glitch (Nullified uncropped full-sheet flashes).
+ * - NEW: Dynamic Battle Status Refresh (Syncs Retro HUD to Popups & Costs).
+ * - NEW: Context Window Logic (Dynamic height scaling, Class Dummy Variables).
+ * - FIX: Changed actor.classId() to actor._classId to prevent TypeErrors.
+ * - FIX: Re-linked Ammo Context UI to trigger off Weapon Type ID 8 (Guns).
+ * - UPGRADE: Ammo Context UI maps real Weapon Name and Icon from equipment.
  */
 
 (() => {
@@ -218,7 +223,88 @@
 
     Window_BattleContext.prototype.refresh = function(actor) {
         this.contents.clear();
-        if (actor) { } 
+        if (!actor) return;
+
+        // Fetch equipped guns directly from the actor's weapons array
+        const guns = actor.weapons().filter(weapon => weapon && weapon.wtypeId === 8);
+        const hasGun = guns.length > 0;
+        
+        const isFarmer = actor._classId === 4; 
+        const isCultivator = actor._classId === 6; 
+
+        let lines = 0;
+        let drawMode = "none";
+
+        // Map real weapon data and inject dummy ammo amounts for testing
+        const gunData = guns.map(weapon => {
+            return {
+                name: weapon.name,
+                iconIndex: weapon.iconIndex,
+                currentAmmo: 6, // PHASE 4 TODO: Replace with actor's true ammo property
+                maxAmmo: 6      // PHASE 4 TODO: Replace with weapon's true max ammo tag
+            };
+        });
+
+        // Remaining Phase 4 Dummy Data
+        const dummyElement = { name: "Fire", iconIndex: 97 };
+        const dummySeeds = [
+            { name: "Brandywine", turns: 3 },
+            { name: "Moon & Stars", turns: 1 },
+            { name: "Slimes", turns: 0 }
+        ];
+
+        if (hasGun) {
+            drawMode = "ammo";
+            lines = gunData.length || 1;
+        } else if (isCultivator) {
+            drawMode = "cultivator";
+            lines = 1;
+        } else if (isFarmer) {
+            drawMode = "farmer";
+            lines = dummySeeds.length > 0 ? dummySeeds.length : 1;
+        }
+
+        const newHeight = lines > 0 ? this.fittingHeight(lines) : 0;
+        if (this.height !== newHeight) {
+            this.height = newHeight;
+            if (newHeight > 0) {
+                this.createContents();
+            }
+        }
+
+        if (drawMode === "none" || newHeight === 0) return;
+
+        const commandRect = SceneManager._scene.actorCommandWindowRect();
+        this.y = commandRect.y - this.height;
+
+        this.resetFontSettings();
+
+        // Execution Branches
+        if (drawMode === "ammo") {
+            for (let i = 0; i < gunData.length; i++) {
+                const y = i * this.lineHeight();
+                this.drawIcon(gunData[i].iconIndex, 0, y + 2);
+                this.changeTextColor(ColorManager.normalColor());
+                this.drawText(gunData[i].name, 36, y, this.innerWidth - 80, "left");
+                this.drawText(`${gunData[i].currentAmmo}/${gunData[i].maxAmmo}`, 0, y, this.innerWidth - 4, "right");
+            }
+        } else if (drawMode === "cultivator") {
+            this.drawIcon(dummyElement.iconIndex, 0, 2);
+            this.changeTextColor(ColorManager.normalColor());
+            this.drawText(dummyElement.name, 36, 0, this.innerWidth - 36, "left");
+        } else if (drawMode === "farmer") {
+            if (dummySeeds.length === 0) {
+                this.changeTextColor(ColorManager.systemColor());
+                this.drawText("No seeds planted", 0, 0, this.innerWidth, "center");
+            } else {
+                for (let i = 0; i < dummySeeds.length; i++) {
+                    const y = i * this.lineHeight();
+                    this.changeTextColor(ColorManager.normalColor());
+                    this.drawText(dummySeeds[i].name, 0, y, this.innerWidth - 30, "left");
+                    this.drawText(dummySeeds[i].turns, 0, y, this.innerWidth - 4, "right");
+                }
+            }
+        }
     };
 
     //=============================================================================
@@ -255,6 +341,7 @@
 
     Scene_Battle.prototype.contextWindowRect = function() {
         const ww = Graphics.boxWidth - 352;
+        // Start initialization at 1-line height; the refresh function handles scaling it dynamically
         const wh = this.calcWindowHeight(1, false); 
         const wx = 352;
         const wy = this.actorCommandWindowRect().y - wh; 
@@ -348,6 +435,7 @@
         _Scene_Battle_startActorCommandSelection.call(this);
         const actor = BattleManager.actor();
         if (actor) {
+            // Trigger dynamic data fetches and height adjustments right before opening
             this._mpInfoWindow.refresh(actor);
             this._contextWindow.refresh(actor);
             
@@ -356,7 +444,14 @@
             } else {
                 this._mpInfoWindow.hide();
             }
-            this._contextWindow.show(); 
+
+            // Only show context window if the actor has a Gun or belongs to Farmer/Cultivator class
+            const hasGun = actor.weapons().some(weapon => weapon && weapon.wtypeId === 8);
+            if (hasGun || actor._classId === 4 || actor._classId === 6) {
+                this._contextWindow.show(); 
+            } else {
+                this._contextWindow.hide();
+            }
         }
     };
 
@@ -628,7 +723,6 @@
         this.anchor.y = 0.5; 
         this.z = 8; 
         
-        // Hide the sprite while it loads to prevent the "uncropped full-sheet flash"
         this.visible = false; 
         
         this._tick = 0;
@@ -643,7 +737,6 @@
         if (!this._isPlaying) return;
         if (!this.bitmap || !this.bitmap.isReady()) return; 
         
-        // The exact millisecond the image loads, apply the crop math BEFORE revealing it
         if (!this.visible) {
             this.visible = true;
         }
@@ -732,6 +825,37 @@
             }
         } else {
             _Window_BattleLog_showAnimation.call(this, subject, targets, animationId);
+        }
+    };
+
+    //=============================================================================
+    // 11. Dynamic Battle Status Refresh (HP/MP Sync)
+    //=============================================================================
+
+    const _Sprite_Battler_setupDamagePopup = Sprite_Battler.prototype.setupDamagePopup;
+    Sprite_Battler.prototype.setupDamagePopup = function() {
+        const requested = this._battler && this._battler.isDamagePopupRequested();
+        _Sprite_Battler_setupDamagePopup.call(this);
+        
+        if (requested && this._battler.isActor() && SceneManager._scene instanceof Scene_Battle) {
+            const statusWindow = SceneManager._scene._statusWindow;
+            if (statusWindow) {
+                const index = $gameParty.battleMembers().indexOf(this._battler);
+                if (index >= 0) statusWindow.redrawItem(index);
+            }
+        }
+    };
+
+    const _Game_BattlerBase_paySkillCost = Game_BattlerBase.prototype.paySkillCost;
+    Game_BattlerBase.prototype.paySkillCost = function(skill) {
+        _Game_BattlerBase_paySkillCost.call(this, skill);
+        
+        if (this.isActor() && $gameParty.inBattle() && SceneManager._scene instanceof Scene_Battle) {
+            const statusWindow = SceneManager._scene._statusWindow;
+            if (statusWindow) {
+                const index = $gameParty.battleMembers().indexOf(this);
+                if (index >= 0) statusWindow.redrawItem(index);
+            }
         }
     };
 
