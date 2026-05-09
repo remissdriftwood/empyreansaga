@@ -1,23 +1,17 @@
 /*:
  * @target MZ
- * @plugindesc Phase 4: Shared Battle Mechanics v1.4
+ * @plugindesc Phase 4: Shared Battle Mechanics v1.6
  * @author Custom Build
  * * @help
  * Implements:
- * - Two-Handed Dual Wield (Weapon Types 8 & 12 lock off-hand slot).
  * - Ammo System (<max ammo: X>, <shots: X>, Ammo Crate State 29).
  * - Dual Wield Volley Split (<dual wield hits> or Basic Attacks).
  * - Action Sequencing (<random repeats: X-Y>, <random extra hit: Z>, <follow up X: Y%>).
  * - Fighter MP Regen (Restores 1 MP per successful normal/dual-wield hit).
  * - Battle Circle Registry (Backend array for Phase 5 Cleric/Martyr skills).
- * - FIX: Hard-mapped Ammo arrays to specific Equipment Slots (fixes 6/6 bug).
- * - FIX: Shifted tag parsing to raw Regex to guarantee <max ammo> reads.
- * - UPGRADE: Fighters now pop up green "1"s per bullet hit.
- * - FIX: Swapped gainMp() for raw setMp() to eliminate native phantom popups.
- * - UPGRADE: Reloading now pushes notifications directly to the UI Banner Window.
- * - FIX: Removed redundant UI dummy-data override to prevent load order collisions.
- * - NEW: Custom Skill Sort Order via <sort_order: x> tags.
- * - NEW: Circle System End-of-Turn Pulse Hooks.
+ * - Custom Skill Sort Order via <sort_order: x> tags.
+ * - Circle System End-of-Turn Pulse Hooks.
+ * - FIX: Eradicated restrictive 2H slot-locking logic to allow absolute Dual Wield freedom.
  */
 
 (() => {
@@ -29,44 +23,20 @@
     const CONFIG = {
         FIGHTER_CLASS_ID: 1,
         AMMO_CRATE_STATE_ID: 29,
-        TWO_HANDED_WTYPES: [8, 12],
         DUAL_WIELD_PENALTY: 0.75
     };
 
     //=============================================================================
-    // 1. Titan's Grip (Two-Handed Equipment Locks)
+    // 1. Equipment Hook (Ammo Refresh Only)
     //=============================================================================
     const _Game_Actor_changeEquip = Game_Actor.prototype.changeEquip;
     Game_Actor.prototype.changeEquip = function(slotId, item) {
-        if (this._isChangingEquip) {
-            _Game_Actor_changeEquip.call(this, slotId, item);
-            return;
-        }
-        
-        this._isChangingEquip = true;
         _Game_Actor_changeEquip.call(this, slotId, item);
         
-        if (this.isDualWield()) {
-            const mainHand = this.equips()[0];
-            const offHand = this.equips()[1];
-            
-            if (slotId === 0 && mainHand && CONFIG.TWO_HANDED_WTYPES.includes(mainHand.wtypeId) && offHand) {
-                this.changeEquip(1, null);
-            }
-            if (slotId === 1 && offHand && CONFIG.TWO_HANDED_WTYPES.includes(offHand.wtypeId) && mainHand) {
-                this.changeEquip(0, null);
-            }
-            if (slotId === 1 && offHand && !CONFIG.TWO_HANDED_WTYPES.includes(offHand.wtypeId) && mainHand && CONFIG.TWO_HANDED_WTYPES.includes(mainHand.wtypeId)) {
-                this.changeEquip(0, null);
-            }
-            if (slotId === 0 && mainHand && !CONFIG.TWO_HANDED_WTYPES.includes(mainHand.wtypeId) && offHand && CONFIG.TWO_HANDED_WTYPES.includes(offHand.wtypeId)) {
-                this.changeEquip(1, null);
-            }
+        // Silently refresh the ammo tracking array when weapons are swapped
+        if (slotId === 0 || slotId === 1) {
+            this.refreshAmmoSlot(slotId);
         }
-        
-        if (slotId === 0 || slotId === 1) this.refreshAmmoSlot(slotId);
-        
-        this._isChangingEquip = false;
     };
 
     //=============================================================================

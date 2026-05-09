@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 2: Battle UI & Sprite Architecture v1.45.
+ * @plugindesc Phase 2: Battle UI & Sprite Architecture v1.46.
  * @author Custom Build
  * * @help
  * Implements:
@@ -42,6 +42,7 @@
  * - FIX: Skill/Item cursor overrides Phase 1 to remain visible while targeting.
  * - FIX: Cursor mathematically calculates and initializes on top-leftmost grid enemy.
  * - FIX: Adjusted targeting cursor Y-buffer to -16 for perfect alignment.
+ * - NEW: AoE Target Sorting (Forces Left-to-Right, Top-to-Bottom damage sweeps).
  */
 
 (() => {
@@ -53,7 +54,7 @@
     
     const TARGETING_CONFIG = {
         BUFFER_X: -4,
-        BUFFER_Y: -12, // Adjusted to -12
+        BUFFER_Y: -12, // Adjusted to user preference
         NAME_COLOR_INDEX: 10 
     };
 
@@ -1145,6 +1146,34 @@
         if (!this.active && this.index() >= 0 && $gameParty.inBattle() && this.visible) {
             if (this._cursorSprite) this._cursorSprite.visible = true;
         }
+    };
+
+    //=============================================================================
+    // 14. AoE Target Sorting (Grid Order Consistency)
+    //=============================================================================
+
+    // Forces multi-target actions to calculate and popup Left-to-Right, Top-to-Bottom
+    const _Game_Action_makeTargets = Game_Action.prototype.makeTargets;
+    Game_Action.prototype.makeTargets = function() {
+        let targets = _Game_Action_makeTargets.call(this);
+        
+        // Only sort if there are multiple targets and they are enemies
+        if (targets.length > 1 && targets[0] && targets[0].isEnemy()) {
+            targets.sort((a, b) => {
+                const aY = a._gridY !== undefined ? a._gridY : 99;
+                const bY = b._gridY !== undefined ? b._gridY : 99;
+                const aX = a._gridX !== undefined ? a._gridX : 99;
+                const bX = b._gridX !== undefined ? b._gridX : 99;
+                
+                // Primary Sort: Top to Bottom (Row)
+                if (aY !== bY) return aY - bY;
+                
+                // Secondary Sort: Left to Right (Column)
+                return aX - bX;
+            });
+        }
+        
+        return targets;
     };
 
 })();
