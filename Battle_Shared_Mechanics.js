@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 4: Shared Battle Mechanics v1.3
+ * @plugindesc Phase 4: Shared Battle Mechanics v1.4
  * @author Custom Build
  * * @help
  * Implements:
@@ -16,6 +16,8 @@
  * - FIX: Swapped gainMp() for raw setMp() to eliminate native phantom popups.
  * - UPGRADE: Reloading now pushes notifications directly to the UI Banner Window.
  * - FIX: Removed redundant UI dummy-data override to prevent load order collisions.
+ * - NEW: Custom Skill Sort Order via <sort_order: x> tags.
+ * - NEW: Circle System End-of-Turn Pulse Hooks.
  */
 
 (() => {
@@ -48,25 +50,20 @@
             const mainHand = this.equips()[0];
             const offHand = this.equips()[1];
             
-            // If slot 0 is 2H, unequip slot 1
             if (slotId === 0 && mainHand && CONFIG.TWO_HANDED_WTYPES.includes(mainHand.wtypeId) && offHand) {
                 this.changeEquip(1, null);
             }
-            // If slot 1 is 2H, unequip slot 0
             if (slotId === 1 && offHand && CONFIG.TWO_HANDED_WTYPES.includes(offHand.wtypeId) && mainHand) {
                 this.changeEquip(0, null);
             }
-            // If equipping a 1H in slot 1, but slot 0 is 2H, unequip slot 0
             if (slotId === 1 && offHand && !CONFIG.TWO_HANDED_WTYPES.includes(offHand.wtypeId) && mainHand && CONFIG.TWO_HANDED_WTYPES.includes(mainHand.wtypeId)) {
                 this.changeEquip(0, null);
             }
-            // If equipping a 1H in slot 0, but slot 1 is 2H, unequip slot 1
             if (slotId === 0 && mainHand && !CONFIG.TWO_HANDED_WTYPES.includes(mainHand.wtypeId) && offHand && CONFIG.TWO_HANDED_WTYPES.includes(offHand.wtypeId)) {
                 this.changeEquip(1, null);
             }
         }
         
-        // Refresh Ammo array if weapons changed
         if (slotId === 0 || slotId === 1) this.refreshAmmoSlot(slotId);
         
         this._isChangingEquip = false;
@@ -123,37 +120,30 @@
             return;
         }
 
-        // --- A. DUAL WIELD VOLLEY SPLIT ---
         const isNormalAttack = action.isAttack();
         const isTagged = action.item() && action.item().note && action.item().note.match(/<dual wield hits>/i);
         
-        // If this is the initial triggering of an attack...
         if (subject.isActor() && (isNormalAttack || isTagged) && action._equipSlot === undefined && !action._isExtraHit && !action._isFollowUp) {
-            
             const equips = subject.equips();
             const w1 = equips[0];
             const w2 = equips[1];
             
             if (w1) {
                 action._equipSlot = 0;
-                // If they have an off-hand weapon, queue its attack immediately behind the main-hand
                 if (w2) {
                     const offhandAction = new Game_Action(subject);
                     offhandAction.setItemObject(action.item());
                     offhandAction._equipSlot = 1;
-                    offhandAction.targetIndex = action.targetIndex; // Retain target lock
+                    offhandAction.targetIndex = action.targetIndex; 
                     subject._actions.splice(1, 0, offhandAction);
                 }
             } else if (w2) {
-                // If only an offhand is equipped
                 action._equipSlot = 1;
             } else {
-                // Unarmed
                 action._equipSlot = -1; 
             }
         }
 
-        // --- B. AMMO CALCULATION & RELOAD HIJACK ---
         if (subject.isActor() && action._equipSlot !== undefined && action._equipSlot >= 0) {
             const weapon = subject.equips()[action._equipSlot];
             
@@ -165,7 +155,6 @@
                     const currentAmmo = subject._ammo[action._equipSlot] || 0;
                     
                     if (currentAmmo <= 0 && !isCrate) {
-                        // Abort Attack: Force Reload Action and trigger Custom Banner
                         this._logWindow.push("showBanner", `${subject.name()} reloaded ${weapon.name}!`);
                         this._logWindow.push("wait");
                         this._logWindow.push("wait");
@@ -173,18 +162,13 @@
                         this._logWindow.push("hideBanner");
                         
                         subject._ammo[action._equipSlot] = parseInt(maxMatch[1]);
-                        
-                        // Blank the targets array so MZ gracefully skips damage execution without crashing
                         action.makeTargets = function() { return []; }; 
                     } else {
-                        // Consume Ammo
                         const shotsMatch = weapon.note.match(/<shots:\s*(\d+)>/i);
                         const shots = shotsMatch ? parseInt(shotsMatch[1]) : 1;
                         const fired = isCrate ? shots : Math.min(currentAmmo, shots);
                         
                         if (!isCrate) subject._ammo[action._equipSlot] -= fired;
-                        
-                        // Feed this value to the Repeats function below to force X hits
                         action._shotsFired = fired;
                     }
                 }
@@ -194,7 +178,6 @@
         _BattleManager_startAction.call(this);
     };
 
-    // Override the number of hits based on weapon shots or random repeats
     const _Game_Action_numRepeats = Game_Action.prototype.numRepeats;
     Game_Action.prototype.numRepeats = function() {
         if (this._shotsFired !== undefined) return this._shotsFired;
@@ -212,7 +195,6 @@
         return repeats;
     };
 
-    // Ensure the proper weapon animation plays during the Off-Hand Dual Wield volley
     const _Game_Action_itemAnimationId = Game_Action.prototype.itemAnimationId;
     Game_Action.prototype.itemAnimationId = function() {
         const isTagged = this.item() && this.item().note && this.item().note.match(/<dual wield hits>/i);
@@ -234,20 +216,14 @@
         const hit = target.result().isHit();
 
         if (hit && item) {
-            // A. Fighter MP Regen (Triggers per individual hit)
             if (subject.isActor() && subject._classId === CONFIG.FIGHTER_CLASS_ID) {
                 const isTagged = item.note && item.note.match(/<dual wield hits>/i);
                 if (this.isAttack() || isTagged) {
-                    
-                    // Directly sets the MP without touching _result.mpDamage to prevent the engine from generating a phantom black text popup
                     subject.setMp(subject.mp + 1); 
-                    
-                    // Fires the Custom UI Text Popup from Phase 3 in Retro Green
                     subject.requestCustomTextPopup("1", "heal"); 
                 }
             }
 
-            // B. Random Extra Hit
             if (item.note && item.note.match(/<random extra hit:\s*(\d+(?:\.\d+)?)>/i) && !this._isExtraHit) {
                 const extraMatch = item.note.match(/<random extra hit:\s*(\d+(?:\.\d+)?)>/i);
                 if (extraMatch) {
@@ -257,7 +233,6 @@
                     extraAction._isExtraHit = true; 
                     extraAction._extraHitMod = dmgMod;
                     
-                    // Target a random living enemy
                     const newTarget = $gameTroop.aliveMembers()[Math.floor(Math.random() * $gameTroop.aliveMembers().length)];
                     if (newTarget) {
                         extraAction.targetIndex = newTarget.index();
@@ -266,7 +241,6 @@
                 }
             }
 
-            // C. Follow-Up Skill
             if (item.note && item.note.match(/<follow up (\d+)(?::\s*(\d+)[%％])?>/i) && !this._isFollowUp) {
                 const followMatch = item.note.match(/<follow up (\d+)(?::\s*(\d+)[%％])?>/i);
                 const skillId = parseInt(followMatch[1]);
@@ -283,12 +257,10 @@
         }
     };
 
-    // Apply Damage Penalties (Dual Wield & Extra Hits)
     const _Game_Action_makeDamageValue = Game_Action.prototype.makeDamageValue;
     Game_Action.prototype.makeDamageValue = function(target, critical) {
         let value = _Game_Action_makeDamageValue.call(this, target, critical);
         
-        // 25% Dual Wield Penalty
         if (this.subject().isActor() && this.subject().weapons().filter(w => w).length > 1) {
             const isTagged = this.item() && this.item().note && this.item().note.match(/<dual wield hits>/i);
             if (this.isAttack() || isTagged) {
@@ -296,7 +268,6 @@
             }
         }
 
-        // Extra Hit Modifier (e.g., 0.5)
         if (this._extraHitMod) {
             value = Math.floor(value * this._extraHitMod);
         }
@@ -311,7 +282,6 @@
 
     BattleManager.addCircle = function(caster, skillId, duration) {
         if (!this._activeCircles) this._activeCircles = [];
-        // Reject existing circles from the same caster to prevent overlap
         this._activeCircles = this._activeCircles.filter(c => c.caster !== caster);
         this._activeCircles.push({
             caster: caster,
@@ -326,6 +296,53 @@
 
     BattleManager.clearCircles = function() {
         this._activeCircles = [];
+    };
+
+    // Circle Pulse Hook - Executes at the start of the Turn End Phase
+    const _BattleManager_endTurn = BattleManager.endTurn;
+    BattleManager.endTurn = function() {
+        if (this._activeCircles && this._activeCircles.length > 0) {
+            this._activeCircles = this._activeCircles.filter(circle => {
+                if (circle.caster && circle.caster.isAlive()) {
+                    circle.caster.forceAction(circle.skillId, -1);
+                    BattleManager.forceAction(circle.caster);
+                    circle.duration--;
+                    return circle.duration > 0;
+                }
+                return false; 
+            });
+        }
+        _BattleManager_endTurn.call(this);
+    };
+
+    //=============================================================================
+    // 6. Custom Skill Sort Order 
+    //=============================================================================
+    const _Window_SkillList_makeItemList = Window_SkillList.prototype.makeItemList;
+    Window_SkillList.prototype.makeItemList = function() {
+        _Window_SkillList_makeItemList.call(this);
+        
+        if (this._data && this._data.length > 0) {
+            this._data.sort((a, b) => {
+                let orderA = 0;
+                let orderB = 0;
+                
+                if (a && a.note) {
+                    const matchA = a.note.match(/<sort_order:\s*(-?\d+)>/i);
+                    if (matchA) orderA = parseInt(matchA[1]);
+                }
+                if (b && b.note) {
+                    const matchB = b.note.match(/<sort_order:\s*(-?\d+)>/i);
+                    if (matchB) orderB = parseInt(matchB[1]);
+                }
+                
+                if (orderA !== orderB) {
+                    return orderA - orderB;
+                }
+                // Fallback to database ID to ensure deterministic sorting
+                return (a.id || 0) - (b.id || 0); 
+            });
+        }
     };
 
 })();
