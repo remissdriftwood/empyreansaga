@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 2: Battle UI & Sprite Architecture v1.50.
+ * @plugindesc Phase 2: Battle UI & Sprite Architecture v1.51.
  * @author Custom Build
  * * @help
  * Implements:
@@ -47,7 +47,7 @@
  * - UPGRADE: Command Remember integrated. Memorizes grid coordinates per-actor.
  * - FIX: Changed Command Remember check to ConfigManager to fix TypeError crash.
  * - UPGRADE: Added "Screen" parameter to <Anim: Name, Sound, Scope> for field-wide casts.
- * - FIX: Stripped redundant BattleLog waits that caused massive 2-second AoE pauses.
+ * - FIX: Restored native wait command to displayAction after scope timing fix.
  */
 
 (() => {
@@ -709,12 +709,13 @@
         _Window_BattleLog_startAction.call(this, subject, action, targets);
     };
 
-    // Stripped redundant wait command to prevent massive engine stalls on AoE casts
+    // Restored the native push("wait") command after scope fix
     const _Window_BattleLog_displayAction = Window_BattleLog.prototype.displayAction;
     Window_BattleLog.prototype.displayAction = function(subject, item) {
         const action = subject.currentAction();
         if (action && action._isCirclePulse) return; // Silent execution for End-of-Turn pulses
         this.push("showBanner", item.name);
+        this.push("wait"); 
     };
 
     Window_BattleLog.prototype.showBanner = function(name) {

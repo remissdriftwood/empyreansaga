@@ -1,15 +1,16 @@
 /*:
  * @target MZ
- * @plugindesc Phase 5: Cleric Class Mechanics v1.2_Debug
+ * @plugindesc Phase 5: Cleric Class Mechanics v1.3
  * @author Custom Build
  * * @help
  * Implements:
  * - Healer's Reward: Recovers 1 MP per target healed by a Cleric skill.
  * - Foehn Dispel (Skill 48): Clears buffs and states from ALL battlers.
  * * Protect specific states using the <foehn_immune> notetag.
- * - Circle Registration: Use <circle: X, Y> (Comma separated IDs) and <duration: Z>.
+ * - Circle Registration: Use <circle: X> (X = Pulse Skill ID) and <duration: Y>.
  * - Circle Death Cleanse: Removes active circles when the caster dies.
  * - Circle of Immortality: Hard-caps lethal damage at target.hp - 1.
+ * - REVERTED: Multi-skill array logic removed. Replaced by native MZ "Enemy & Ally" scope.
  */
 
 (() => {
@@ -30,15 +31,14 @@
     
     BattleManager.addCircle = function(caster, pulseSkillId, sourceSkillId, duration) {
         if (!this._activeCircles) this._activeCircles = [];
-        
-        // Push the new circle without auto-deleting to allow for multi-skill stacking
+        // Strictly prevent multiple circles from the same caster by overwriting
+        this._activeCircles = this._activeCircles.filter(c => c.caster !== caster);
         this._activeCircles.push({
             caster: caster,
             skillId: pulseSkillId, 
-            sourceSkillId: sourceSkillId, 
+            sourceSkillId: sourceSkillId,
             duration: duration
         });
-        console.log(`[CIRCLE DEBUG] Successfully registered Circle! Caster: ${caster.name()}, PulseSkill: ${pulseSkillId}, SourceSkill: ${sourceSkillId}, Duration: ${duration}`);
     };
 
     const _Game_Action_applyGlobal = Game_Action.prototype.applyGlobal;
@@ -47,27 +47,15 @@
         
         const item = this.item();
         if (item && item.note) {
-            // Regex upgraded to accept digits, commas, and spaces
-            const circleMatch = item.note.match(/<circle:\s*([\d,\s]+)>/i);
+            // Reverted back to single-integer parsing logic
+            const circleMatch = item.note.match(/<circle:\s*(\d+)>/i);
             if (circleMatch) {
-                console.log(`[CIRCLE DEBUG] Found <circle> tag on skill: ${item.name}`);
-                
-                // Split comma-separated string into an array of Integers
-                const pulseIds = circleMatch[1].split(',').map(id => parseInt(id.trim()));
-                
+                const pulseId = parseInt(circleMatch[1]);
                 let duration = 3;
                 const durMatch = item.note.match(/<duration:\s*(\d+)>/i);
                 if (durMatch) duration = parseInt(durMatch[1]);
                 
-                // Nuke any previous circles from this specific caster BEFORE we add the new ones
-                if (BattleManager._activeCircles) {
-                    BattleManager._activeCircles = BattleManager._activeCircles.filter(c => c.caster !== this.subject());
-                }
-
-                // Register every skill ID found in the tag
-                pulseIds.forEach(pulseId => {
-                    BattleManager.addCircle(this.subject(), pulseId, item.id, duration);
-                });
+                BattleManager.addCircle(this.subject(), pulseId, item.id, duration);
             }
         }
     };
@@ -79,11 +67,7 @@
     Game_BattlerBase.prototype.die = function() {
         _Game_BattlerBase_die.call(this);
         if (BattleManager._activeCircles) {
-            const initialCount = BattleManager._activeCircles.length;
             BattleManager._activeCircles = BattleManager._activeCircles.filter(c => c.caster !== this);
-            if (initialCount > BattleManager._activeCircles.length) {
-                console.log(`[CIRCLE DEBUG] Caster ${this.name()} died. Removed their active circles.`);
-            }
         }
     };
 
@@ -123,7 +107,6 @@
             
             if (hasImmortality) {
                 value = target.hp - 1; 
-                console.log(`[CIRCLE DEBUG] Immortality saved ${target.name()}! Capped damage at ${value}`);
             }
         }
 
