@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 2: Battle UI & Sprite Architecture v1.46.
+ * @plugindesc Phase 2: Battle UI & Sprite Architecture v1.50.
  * @author Custom Build
  * * @help
  * Implements:
@@ -40,9 +40,14 @@
  * - FIX: Help Window dynamically hides during targeting to prevent overlap.
  * - FIX: Destroys phantom native Window_BattleEnemy cursor rect collision.
  * - FIX: Skill/Item cursor overrides Phase 1 to remain visible while targeting.
- * - FIX: Cursor mathematically calculates and initializes on top-leftmost grid enemy.
- * - FIX: Adjusted targeting cursor Y-buffer to -16 for perfect alignment.
+ * - FIX: Adjusted targeting cursor Y-buffer to -12 for perfect alignment.
  * - NEW: AoE Target Sorting (Forces Left-to-Right, Top-to-Bottom damage sweeps).
+ * - UPGRADE: Strict 2D Left/Right horizontal wrapping (skips empty grid cells).
+ * - UPGRADE: Strict 2D Up/Down vertical wrapping within columns.
+ * - UPGRADE: Command Remember integrated. Memorizes grid coordinates per-actor.
+ * - FIX: Changed Command Remember check to ConfigManager to fix TypeError crash.
+ * - UPGRADE: Added "Screen" parameter to <Anim: Name, Sound, Scope> for field-wide casts.
+ * - FIX: Stripped redundant BattleLog waits that caused massive 2-second AoE pauses.
  */
 
 (() => {
@@ -54,7 +59,7 @@
     
     const TARGETING_CONFIG = {
         BUFFER_X: -4,
-        BUFFER_Y: -12, // Adjusted to user preference
+        BUFFER_Y: -12, 
         NAME_COLOR_INDEX: 10 
     };
 
@@ -508,8 +513,9 @@
     const _Scene_Battle_endCommandSelection = Scene_Battle.prototype.endCommandSelection;
     Scene_Battle.prototype.endCommandSelection = function() {
         _Scene_Battle_endCommandSelection.call(this);
-        this._mpInfoWindow.hide();
-        this._contextWindow.hide();
+        if (this._mpInfoWindow) this._mpInfoWindow.hide();
+        if (this._contextWindow) this._contextWindow.hide();
+        if (this._helpWindow) this._helpWindow.hide(); 
     };
 
     //=============================================================================
@@ -703,9 +709,12 @@
         _Window_BattleLog_startAction.call(this, subject, action, targets);
     };
 
+    // Stripped redundant wait command to prevent massive engine stalls on AoE casts
+    const _Window_BattleLog_displayAction = Window_BattleLog.prototype.displayAction;
     Window_BattleLog.prototype.displayAction = function(subject, item) {
+        const action = subject.currentAction();
+        if (action && action._isCirclePulse) return; // Silent execution for End-of-Turn pulses
         this.push("showBanner", item.name);
-        this.push("wait"); 
     };
 
     Window_BattleLog.prototype.showBanner = function(name) {
@@ -800,17 +809,21 @@
 
     Sprite_RetroAnim.prototype.updatePosition = function() {
         if (this._targetSprite) {
-            this.x = this._targetSprite.x;
-            
-            let yOffset = 0;
-            if (this._targetSprite instanceof Sprite_Actor) {
-                yOffset = 24; 
-            } else if (this._targetSprite.bitmap) {
-                yOffset = this._targetSprite.bitmap.height / 2; 
+            if (this._targetSprite === "screen") {
+                this.x = Graphics.boxWidth / 2;
+                this.y = Graphics.boxHeight / 2;
             } else {
-                yOffset = 32; 
+                this.x = this._targetSprite.x;
+                let yOffset = 0;
+                if (this._targetSprite instanceof Sprite_Actor) {
+                    yOffset = 24; 
+                } else if (this._targetSprite.bitmap) {
+                    yOffset = this._targetSprite.bitmap.height / 2; 
+                } else {
+                    yOffset = 32; 
+                }
+                this.y = this._targetSprite.y - yOffset;
             }
-            this.y = this._targetSprite.y - yOffset;
         }
     };
 
@@ -849,22 +862,31 @@
             const tagData = item.meta.Anim.split(",");
             const animName = String(tagData[0]).trim();
             const soundName = tagData.length > 1 ? String(tagData[1]).trim() : null;
+            const scope = tagData.length > 2 ? String(tagData[2]).trim().toLowerCase() : "target";
             
             if (this._spriteset) {
                 let soundPlayed = false;
-                targets.forEach(target => {
-                    const targetSprite = this._spriteset.findTargetSprite(target);
-                    if (targetSprite && targetSprite.parent) {
-                        const animSprite = new Sprite_RetroAnim(targetSprite, animName);
-                        targetSprite.parent.addChild(animSprite);
-                        this._spriteset._retroAnimations.push(animSprite);
-                        
-                        if (soundName && !soundPlayed) {
-                            AudioManager.playSe({ name: soundName, volume: 90, pitch: 100, pan: 0 });
-                            soundPlayed = true; 
+                
+                if (scope === "screen") {
+                    const animSprite = new Sprite_RetroAnim("screen", animName);
+                    this._spriteset.addChild(animSprite);
+                    this._spriteset._retroAnimations.push(animSprite);
+                    if (soundName) AudioManager.playSe({ name: soundName, volume: 90, pitch: 100, pan: 0 });
+                } else {
+                    targets.forEach(target => {
+                        const targetSprite = this._spriteset.findTargetSprite(target);
+                        if (targetSprite && targetSprite.parent) {
+                            const animSprite = new Sprite_RetroAnim(targetSprite, animName);
+                            targetSprite.parent.addChild(animSprite);
+                            this._spriteset._retroAnimations.push(animSprite);
+                            
+                            if (soundName && !soundPlayed) {
+                                AudioManager.playSe({ name: soundName, volume: 90, pitch: 100, pan: 0 });
+                                soundPlayed = true; 
+                            }
                         }
-                    }
-                });
+                    });
+                }
             }
         } else {
             _Window_BattleLog_showAnimation.call(this, subject, targets, animationId);
@@ -903,7 +925,7 @@
     };
 
     //=============================================================================
-    // 12. Visual Grid Enemy Targeting
+    // 12. Visual Grid Enemy Targeting (Spatial Navigation)
     //=============================================================================
 
     function Sprite_GridTargetCursor() {
@@ -991,56 +1013,63 @@
         }
     };
 
-    Window_BattleEnemy.prototype.getEnemiesInColumn = function(colX) {
-        return $gameTroop.aliveMembers().filter(e => colX >= e._gridX && colX < (e._gridX + e._gridW));
+    // Strict 2D Coordinate Checker
+    Window_BattleEnemy.prototype.getEnemyAt = function(x, y) {
+        return $gameTroop.aliveMembers().find(e => 
+            x >= e._gridX && x < (e._gridX + e._gridW) &&
+            y >= e._gridY && y < (e._gridY + e._gridH)
+        );
     };
 
+    // Rule 0: Audio feedback unconditional on button press
     Window_BattleEnemy.prototype.cursorDown = function(wrap) {
+        SoundManager.playCursor();
         this.processDirUpDown(1);
     };
 
     Window_BattleEnemy.prototype.cursorUp = function(wrap) {
+        SoundManager.playCursor();
         this.processDirUpDown(-1);
     };
 
+    // Vertical Movement (Locks to column, wraps row)
     Window_BattleEnemy.prototype.processDirUpDown = function(dirY) {
         const ce = this.enemy();
         if (!ce) return;
-        let colEnemies = this.getEnemiesInColumn(ce._gridX);
-        colEnemies = colEnemies.filter(e => e !== ce);
-        if (colEnemies.length > 0) {
-            SoundManager.playCursor();
-            this.select($gameTroop.aliveMembers().indexOf(colEnemies[0]));
+        
+        const checkY = (ce._gridY + dirY + 2) % 2;
+        const foundEnemy = this.getEnemyAt(ce._gridX, checkY);
+
+        if (foundEnemy && foundEnemy !== ce) {
+            this.select($gameTroop.aliveMembers().indexOf(foundEnemy));
         }
     };
 
     Window_BattleEnemy.prototype.cursorRight = function(wrap) {
+        SoundManager.playCursor();
         this.processDirLeftRight(1);
     };
 
     Window_BattleEnemy.prototype.cursorLeft = function(wrap) {
+        SoundManager.playCursor();
         this.processDirLeftRight(-1);
     };
 
+    // Horizontal Movement (Locks to row, skips empty space)
     Window_BattleEnemy.prototype.processDirLeftRight = function(dirX) {
         const ce = this.enemy();
         if (!ce) return;
-        let currentX = ce._gridX;
-        let currentY = ce._gridY;
-
+        
+        const currentY = ce._gridY;
+        
         for (let offset = 1; offset <= 3; offset++) {
-            let checkX = (currentX + (offset * dirX));
-            if (checkX > 3) checkX -= 4; 
-            if (checkX < 0) checkX += 4; 
-
-            let colEnemies = this.getEnemiesInColumn(checkX);
-            colEnemies = colEnemies.filter(e => e !== ce);
-            if (colEnemies.length === 0) continue;
-
-            SoundManager.playCursor();
-            let newTarget = colEnemies.find(e => e._gridY === currentY) || colEnemies[0];
-            this.select($gameTroop.aliveMembers().indexOf(newTarget));
-            break;
+            const checkX = (ce._gridX + (offset * dirX) + 4) % 4;
+            const foundEnemy = this.getEnemyAt(checkX, currentY);
+            
+            if (foundEnemy && foundEnemy !== ce) {
+                this.select($gameTroop.aliveMembers().indexOf(foundEnemy));
+                break;
+            }
         }
     };
 
@@ -1068,7 +1097,7 @@
         this._enemyWindow._nameWindow = this._enemyNameWindow;
     };
 
-    // Override Scene flow to manage Help Window and Sub-Windows during Targeting
+    // Override Scene flow to manage Help Window, Sub-Windows, and Command Memory
     Scene_Battle.prototype.selectEnemySelection = function() {
         const action = BattleManager.inputtingAction();
         
@@ -1083,20 +1112,44 @@
         this._enemyWindow.show();
         this._enemyWindow.activate();
 
-        // Calculate geometric top-leftmost living enemy instead of arbitrary Array Index 0
         const members = $gameTroop.aliveMembers();
         let bestIndex = 0;
+        
         if (members.length > 0) {
-            let bestX = 999;
-            let bestY = 999;
-            members.forEach((enemy, i) => {
-                if (enemy._gridX < bestX || (enemy._gridX === bestX && enemy._gridY < bestY)) {
-                    bestX = enemy._gridX;
-                    bestY = enemy._gridY;
-                    bestIndex = i;
+            const actor = BattleManager.actor();
+            const remember = ConfigManager.commandRemember;
+            let foundMemory = false;
+            
+            // Check Actor-Specific Command Memory
+            if (remember && actor && actor._lastTargetGridX !== undefined) {
+                const memX = actor._lastTargetGridX;
+                const memY = actor._lastTargetGridY;
+                
+                const memEnemy = members.find(e => 
+                    memX >= e._gridX && memX < (e._gridX + e._gridW) &&
+                    memY >= e._gridY && memY < (e._gridY + e._gridH)
+                );
+                
+                if (memEnemy) {
+                    bestIndex = members.indexOf(memEnemy);
+                    foundMemory = true;
                 }
-            });
+            }
+            
+            // Fallback to geometric top-leftmost living enemy
+            if (!foundMemory) {
+                let bestX = 999;
+                let bestY = 999;
+                members.forEach((enemy, i) => {
+                    if (enemy._gridX < bestX || (enemy._gridX === bestX && enemy._gridY < bestY)) {
+                        bestX = enemy._gridX;
+                        bestY = enemy._gridY;
+                        bestIndex = i;
+                    }
+                });
+            }
         }
+        
         this._enemyWindow.select(bestIndex);
 
         if (this._helpWindow) this._helpWindow.hide();
@@ -1121,6 +1174,15 @@
 
     const _Scene_Battle_onEnemyOk = Scene_Battle.prototype.onEnemyOk;
     Scene_Battle.prototype.onEnemyOk = function() {
+        
+        // Save the precise target coordinate to the specific Actor's memory
+        const enemy = this._enemyWindow.enemy();
+        const actor = BattleManager.actor();
+        if (enemy && actor) {
+            actor._lastTargetGridX = enemy._gridX;
+            actor._lastTargetGridY = enemy._gridY;
+        }
+        
         _Scene_Battle_onEnemyOk.call(this);
         if (this._skillWindow) this._skillWindow.hide();
         if (this._itemWindow) this._itemWindow.hide();

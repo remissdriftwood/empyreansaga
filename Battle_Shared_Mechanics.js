@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 4: Shared Battle Mechanics v1.6
+ * @plugindesc Phase 4: Shared Battle Mechanics v1.10
  * @author Custom Build
  * * @help
  * Implements:
@@ -10,8 +10,10 @@
  * - Fighter MP Regen (Restores 1 MP per successful normal/dual-wield hit).
  * - Battle Circle Registry (Backend array for Phase 5 Cleric/Martyr skills).
  * - Custom Skill Sort Order via <sort_order: x> tags.
- * - Circle System End-of-Turn Pulse Hooks.
  * - FIX: Eradicated restrictive 2H slot-locking logic to allow absolute Dual Wield freedom.
+ * - FIX: Hooked Game_Action.clear() to wipe cached custom properties and prevent cross-turn pollution.
+ * - UPGRADE: Re-wrote Circle System hooks to queue async execution, supporting multi-pulse skills.
+ * - UPGRADE: Suppresses actor cast animations & skill banners during Circle End-of-Turn pulses.
  */
 
 (() => {
@@ -32,8 +34,6 @@
     const _Game_Actor_changeEquip = Game_Actor.prototype.changeEquip;
     Game_Actor.prototype.changeEquip = function(slotId, item) {
         _Game_Actor_changeEquip.call(this, slotId, item);
-        
-        // Silently refresh the ammo tracking array when weapons are swapped
         if (slotId === 0 || slotId === 1) {
             this.refreshAmmoSlot(slotId);
         }
@@ -75,6 +75,17 @@
             if (match) max = parseInt(match[1]);
         }
         this._ammo[slotId] = max;
+    };
+
+    const _Game_Action_clear = Game_Action.prototype.clear;
+    Game_Action.prototype.clear = function() {
+        _Game_Action_clear.call(this);
+        this._equipSlot = undefined;
+        this._shotsFired = undefined;
+        this._isExtraHit = undefined;
+        this._extraHitMod = undefined;
+        this._isFollowUp = undefined;
+        this._isCirclePulse = undefined;
     };
 
     //=============================================================================
@@ -174,9 +185,6 @@
         return _Game_Action_itemAnimationId.call(this);
     };
 
-    //=============================================================================
-    // 4. Action Sequencer (Extra Hits, Follow-ups, & MP Regen)
-    //=============================================================================
     const _Game_Action_apply = Game_Action.prototype.apply;
     Game_Action.prototype.apply = function(target) {
         _Game_Action_apply.call(this, target);
@@ -246,19 +254,9 @@
     };
 
     //=============================================================================
-    // 5. Circle System Backend Registry
+    // 5. Circle System Async End-of-Turn Processing
     //=============================================================================
     BattleManager._activeCircles = [];
-
-    BattleManager.addCircle = function(caster, skillId, duration) {
-        if (!this._activeCircles) this._activeCircles = [];
-        this._activeCircles = this._activeCircles.filter(c => c.caster !== caster);
-        this._activeCircles.push({
-            caster: caster,
-            skillId: skillId,
-            duration: duration
-        });
-    };
 
     BattleManager.getActiveCircles = function() {
         return this._activeCircles || [];
@@ -268,21 +266,65 @@
         this._activeCircles = [];
     };
 
-    // Circle Pulse Hook - Executes at the start of the Turn End Phase
-    const _BattleManager_endTurn = BattleManager.endTurn;
-    BattleManager.endTurn = function() {
-        if (this._activeCircles && this._activeCircles.length > 0) {
-            this._activeCircles = this._activeCircles.filter(circle => {
+    const _BattleManager_startTurn = BattleManager.startTurn;
+    BattleManager.startTurn = function() {
+        _BattleManager_startTurn.call(this);
+        this._circlesPulsedThisTurn = false;
+        this._pendingCircles = [];
+    };
+
+    const _BattleManager_updateTurn = BattleManager.updateTurn;
+    BattleManager.updateTurn = function() {
+        $gameParty.requestMotionRefresh();
+        
+        if (!this._subject) {
+            this._subject = this.getNextSubject();
+        }
+        
+        if (this._subject) {
+            this.processTurn();
+        } else {
+            // Evaluates Circles ONLY once the normal sequence of actions is entirely finished
+            if (!this._circlesPulsedThisTurn) {
+                this._circlesPulsedThisTurn = true;
+                if (this._activeCircles && this._activeCircles.length > 0) {
+                    this._pendingCircles = [...this._activeCircles];
+                    this._activeCircles.forEach(c => c.duration--);
+                    this._activeCircles = this._activeCircles.filter(c => c.duration > 0 && c.caster.isAlive());
+                } else {
+                    this._pendingCircles = [];
+                }
+            }
+            
+            // Sequentially pulls Pulses off the queue, waiting for each to finish before pulling the next
+            if (this._pendingCircles && this._pendingCircles.length > 0) {
+                const circle = this._pendingCircles.shift();
                 if (circle.caster && circle.caster.isAlive()) {
                     circle.caster.forceAction(circle.skillId, -1);
+                    
+                    const action = circle.caster.currentAction();
+                    if (action) action._isCirclePulse = true;
+                    
                     BattleManager.forceAction(circle.caster);
-                    circle.duration--;
-                    return circle.duration > 0;
                 }
-                return false; 
-            });
+                return; // Forces the engine to evaluate the action before allowing endTurn()
+            }
+            
+            this.endTurn();
         }
-        _BattleManager_endTurn.call(this);
+    };
+
+    // Intercept visual updates to suppress the Cleric's cast animation/banner
+    const _Window_BattleLog_performActionStart = Window_BattleLog.prototype.performActionStart;
+    Window_BattleLog.prototype.performActionStart = function(subject, action) {
+        if (action && action._isCirclePulse) return; 
+        _Window_BattleLog_performActionStart.call(this, subject, action);
+    };
+
+    const _Window_BattleLog_performAction = Window_BattleLog.prototype.performAction;
+    Window_BattleLog.prototype.performAction = function(subject, action) {
+        if (action && action._isCirclePulse) return; 
+        _Window_BattleLog_performAction.call(this, subject, action);
     };
 
     //=============================================================================
@@ -309,7 +351,6 @@
                 if (orderA !== orderB) {
                     return orderA - orderB;
                 }
-                // Fallback to database ID to ensure deterministic sorting
                 return (a.id || 0) - (b.id || 0); 
             });
         }
