@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 3: Tactical AI Core v1.17
+ * @plugindesc Phase 3: Tactical AI Core v1.18
  * @author Custom Build
  * * @help
  * Implements:
@@ -9,10 +9,7 @@
  * - <CEB_Bloodlust>: Gains +5% Crit Rate on any death.
  * - <CEB_Digest>: Manages Skill 159 / State 13 limits and death triggers.
  * - <CEB_SmartHeal: SkillID, Threshold%>: Smart validation and targeting.
- * - Embedded UI Patch: Arbitrary 1-bit text popups for status effects.
- * - FIX: Corrected Heal Text to match Phase 2 UI (ColorManager.textColor(20)).
- * - FIX: Decreased popup vertical velocity for a much less violent bounce.
- * - FIX: Zeroed the yOffset so custom popups center exactly like native ones.
+ * - UPGRADE: Relocated arbitrary popup framework to UI core. Wrapped AI heals in UI payload callbacks.
  */
 
 (() => {
@@ -195,8 +192,10 @@
             // Digest 2: Prey Dies
             if (d.wasDigested && d.digester && d.digester.isAlive()) {
                 const healAmount = Math.floor(d.digester.mhp * 0.25);
-                d.digester.gainHp(healAmount);
-                d.digester.requestCustomTextPopup(`${healAmount}`, "heal");
+                
+                d.digester.requestCustomTextPopup(`${healAmount}`, "heal", () => {
+                    d.digester.gainHp(healAmount);
+                });
                 
                 this._logWindow.push("showBanner", `${d.digester.name()} finishes digesting its prey and recovers ${healAmount} HP!`);
                 this._logWindow.push("wait");
@@ -213,8 +212,10 @@
             if (cannibals.length > 0) {
                 cannibals.forEach(c => {
                     const healAmount = c.mhp - c.hp;
-                    c.gainHp(healAmount);
-                    c.requestCustomTextPopup(`${healAmount}`, "heal");
+                    
+                    c.requestCustomTextPopup(`${healAmount}`, "heal", () => {
+                        c.gainHp(healAmount);
+                    });
                 });
                 const msg = cannibals.length > 1 ? "The Carrion Eaters devour the fallen and are healed to full HP!" : `${cannibals[0].name()} devours the fallen and is healed to full HP!`;
                 this._logWindow.push("showBanner", msg);
@@ -231,8 +232,10 @@
             if (leaguers.length > 0) {
                 const bonus = 0.05 * deaths.length;
                 leaguers.forEach(l => {
-                    l._bloodlustBonus = (l._bloodlustBonus || 0) + bonus;
-                    l.requestCustomTextPopup(`CRIT\n+${deaths.length * 5}%`, "normal");
+                    
+                    l.requestCustomTextPopup(`CRIT\n+${deaths.length * 5}%`, "normal", () => {
+                        l._bloodlustBonus = (l._bloodlustBonus || 0) + bonus;
+                    });
                 });
                 const msg = leaguers.length > 1 ? "The Leaguers relish the gore of battle!" : `${leaguers[0].name()} relishes the gore of battle!`;
                 this._logWindow.push("showBanner", msg);
@@ -251,90 +254,6 @@
             value += this._bloodlustBonus;
         }
         return value;
-    };
-
-    //=============================================================================
-    // 6. Embedded UI Patch: Arbitrary Text Popups (Multi-Line & Color Types)
-    //=============================================================================
-
-    Game_Battler.prototype.requestCustomTextPopup = function(text, colorType = "normal") {
-        if (!this._customPopups) this._customPopups = [];
-        this._customPopups.push({ text: text, colorType: colorType });
-    };
-
-    Game_Battler.prototype.isCustomTextPopupRequested = function() {
-        return this._customPopups && this._customPopups.length > 0;
-    };
-
-    const _Sprite_Battler_updateDamagePopup = Sprite_Battler.prototype.updateDamagePopup;
-    Sprite_Battler.prototype.updateDamagePopup = function() {
-        _Sprite_Battler_updateDamagePopup.call(this);
-        if (this._battler && this._battler.isCustomTextPopupRequested()) {
-            const popupData = this._battler._customPopups.shift(); 
-            const sprite = new Sprite_Damage();
-            sprite.x = this.x + this.damageOffsetX();
-            sprite.y = this.y + this.damageOffsetY();
-            sprite.setupArbitraryText(popupData.text, popupData.colorType);
-            this.parent.addChild(sprite);
-            this._damages.push(sprite);
-        }
-    };
-
-    Sprite_Damage.prototype.setupArbitraryText = function(text, colorType) {
-        this._colorType = 0; 
-        const canvasW = 128;
-        const canvasH = 64; 
-        const chunkyThickness = 2;
-        const sprite = this.createChildSprite(canvasW, canvasH);
-        
-        sprite.bitmap.fontFace = $gameSystem.numberFontFace();
-        sprite.bitmap.fontSize = 16;
-        sprite.bitmap.smooth = false;
-        
-        const outlineBmp = new Bitmap(canvasW, canvasH);
-        outlineBmp.fontFace = sprite.bitmap.fontFace;
-        outlineBmp.fontSize = sprite.bitmap.fontSize;
-        outlineBmp.textColor = "#ffffff";
-        outlineBmp.smooth = false;
-        
-        const centerBmp = new Bitmap(canvasW, canvasH);
-        centerBmp.fontFace = sprite.bitmap.fontFace;
-        centerBmp.fontSize = sprite.bitmap.fontSize;
-        // Linked to your specific Windowskin green!
-        centerBmp.textColor = colorType === "heal" ? ColorManager.textColor(20) : "#000000";
-        centerBmp.smooth = false;
-
-        const lines = String(text).split('\n');
-        const lineHeight = 17; 
-        const totalHeight = lines.length * lineHeight;
-        const startY = (canvasH - totalHeight) / 2;
-
-        for (let i = 0; i < lines.length; i++) {
-            outlineBmp.drawText(lines[i], 0, startY + (i * lineHeight), canvasW, lineHeight, "center");
-            centerBmp.drawText(lines[i], 0, startY + (i * lineHeight), canvasW, lineHeight, "center");
-        }
-
-        [outlineBmp, centerBmp].forEach(bmp => {
-            const ctx = bmp.context;
-            const imgData = ctx.getImageData(0, 0, canvasW, canvasH);
-            for (let i = 0; i < imgData.data.length; i += 4) {
-                imgData.data[i + 3] = imgData.data[i + 3] >= 127 ? 255 : 0; 
-            }
-            ctx.putImageData(imgData, 0, 0);
-        });
-
-        sprite.bitmap.outlineWidth = 0;
-        for (let dy = -chunkyThickness; dy <= chunkyThickness; dy++) {
-            for (let dx = -chunkyThickness; dx <= chunkyThickness; dx++) {
-                if (dx === 0 && dy === 0) continue;
-                sprite.bitmap.blt(outlineBmp, 0, 0, canvasW, canvasH, dx, dy);
-            }
-        }
-        sprite.bitmap.blt(centerBmp, 0, 0, canvasW, canvasH, 0, 0);
-        
-        sprite.yOffset = 0; 
-        sprite.ry = 0;
-        sprite.dy = -5; 
     };
 
 })();

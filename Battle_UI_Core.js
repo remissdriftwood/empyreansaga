@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 2: Battle UI & Sprite Architecture v1.51.
+ * @plugindesc Phase 2: Battle UI & Sprite Architecture v1.53.
  * @author Custom Build
  * * @help
  * Implements:
@@ -48,6 +48,8 @@
  * - FIX: Changed Command Remember check to ConfigManager to fix TypeError crash.
  * - UPGRADE: Added "Screen" parameter to <Anim: Name, Sound, Scope> for field-wide casts.
  * - FIX: Restored native wait command to displayAction after scope timing fix.
+ * - UPGRADE: Arbitrary Text Popups migrated to UI Core. Supports payload callbacks for synced HUD updates.
+ * - FIX: Injected explicit Status Window redraws triggered by payload execution for perfect 1:1 HUD sync.
  */
 
 (() => {
@@ -709,11 +711,10 @@
         _Window_BattleLog_startAction.call(this, subject, action, targets);
     };
 
-    // Restored the native push("wait") command after scope fix
     const _Window_BattleLog_displayAction = Window_BattleLog.prototype.displayAction;
     Window_BattleLog.prototype.displayAction = function(subject, item) {
         const action = subject.currentAction();
-        if (action && action._isCirclePulse) return; // Silent execution for End-of-Turn pulses
+        if (action && action._isCirclePulse) return; 
         this.push("showBanner", item.name);
         this.push("wait"); 
     };
@@ -1237,6 +1238,104 @@
         }
         
         return targets;
+    };
+
+    //=============================================================================
+    // 15. Embedded UI Patch: Arbitrary Text Popups (Multi-Line, Color Types & Payload Sync)
+    //=============================================================================
+
+    Game_Battler.prototype.requestCustomTextPopup = function(text, colorType = "normal", payloadCallback = null) {
+        if (!this._customPopups) this._customPopups = [];
+        this._customPopups.push({ text: text, colorType: colorType, callback: payloadCallback });
+    };
+
+    Game_Battler.prototype.isCustomTextPopupRequested = function() {
+        return this._customPopups && this._customPopups.length > 0;
+    };
+
+    const _Sprite_Battler_updateDamagePopup = Sprite_Battler.prototype.updateDamagePopup;
+    Sprite_Battler.prototype.updateDamagePopup = function() {
+        _Sprite_Battler_updateDamagePopup.call(this);
+        if (this._battler && this._battler.isCustomTextPopupRequested()) {
+            const popupData = this._battler._customPopups.shift(); 
+            const sprite = new Sprite_Damage();
+            sprite.x = this.x + this.damageOffsetX();
+            sprite.y = this.y + this.damageOffsetY();
+            sprite.setupArbitraryText(popupData.text, popupData.colorType);
+            this.parent.addChild(sprite);
+            this._damages.push(sprite);
+
+            // Execute payload precisely when visual text drops
+            if (typeof popupData.callback === 'function') {
+                popupData.callback();
+                
+                // Force an immediate UI redraw for this specific battler
+                if (this._battler.isActor() && SceneManager._scene instanceof Scene_Battle) {
+                    const statusWindow = SceneManager._scene._statusWindow;
+                    if (statusWindow) {
+                        const index = $gameParty.battleMembers().indexOf(this._battler);
+                        if (index >= 0) statusWindow.redrawItem(index);
+                    }
+                }
+            }
+        }
+    };
+
+    Sprite_Damage.prototype.setupArbitraryText = function(text, colorType) {
+        this._colorType = 0; 
+        const canvasW = 128;
+        const canvasH = 64; 
+        const chunkyThickness = 2;
+        const sprite = this.createChildSprite(canvasW, canvasH);
+        
+        sprite.bitmap.fontFace = $gameSystem.numberFontFace();
+        sprite.bitmap.fontSize = 16;
+        sprite.bitmap.smooth = false;
+        
+        const outlineBmp = new Bitmap(canvasW, canvasH);
+        outlineBmp.fontFace = sprite.bitmap.fontFace;
+        outlineBmp.fontSize = sprite.bitmap.fontSize;
+        outlineBmp.textColor = "#ffffff";
+        outlineBmp.smooth = false;
+        
+        const centerBmp = new Bitmap(canvasW, canvasH);
+        centerBmp.fontFace = sprite.bitmap.fontFace;
+        centerBmp.fontSize = sprite.bitmap.fontSize;
+        // Linked to your specific Windowskin green!
+        centerBmp.textColor = colorType === "heal" ? ColorManager.textColor(20) : "#000000";
+        centerBmp.smooth = false;
+
+        const lines = String(text).split('\n');
+        const lineHeight = 17; 
+        const totalHeight = lines.length * lineHeight;
+        const startY = (canvasH - totalHeight) / 2;
+
+        for (let i = 0; i < lines.length; i++) {
+            outlineBmp.drawText(lines[i], 0, startY + (i * lineHeight), canvasW, lineHeight, "center");
+            centerBmp.drawText(lines[i], 0, startY + (i * lineHeight), canvasW, lineHeight, "center");
+        }
+
+        [outlineBmp, centerBmp].forEach(bmp => {
+            const ctx = bmp.context;
+            const imgData = ctx.getImageData(0, 0, canvasW, canvasH);
+            for (let i = 0; i < imgData.data.length; i += 4) {
+                imgData.data[i + 3] = imgData.data[i + 3] >= 127 ? 255 : 0; 
+            }
+            ctx.putImageData(imgData, 0, 0);
+        });
+
+        sprite.bitmap.outlineWidth = 0;
+        for (let dy = -chunkyThickness; dy <= chunkyThickness; dy++) {
+            for (let dx = -chunkyThickness; dx <= chunkyThickness; dx++) {
+                if (dx === 0 && dy === 0) continue;
+                sprite.bitmap.blt(outlineBmp, 0, 0, canvasW, canvasH, dx, dy);
+            }
+        }
+        sprite.bitmap.blt(centerBmp, 0, 0, canvasW, canvasH, 0, 0);
+        
+        sprite.yOffset = 0; 
+        sprite.ry = 0;
+        sprite.dy = -5; 
     };
 
 })();

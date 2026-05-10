@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 4: Shared Battle Mechanics v1.10
+ * @plugindesc Phase 4: Shared Battle Mechanics v1.12
  * @author Custom Build
  * * @help
  * Implements:
@@ -12,8 +12,9 @@
  * - Custom Skill Sort Order via <sort_order: x> tags.
  * - FIX: Eradicated restrictive 2H slot-locking logic to allow absolute Dual Wield freedom.
  * - FIX: Hooked Game_Action.clear() to wipe cached custom properties and prevent cross-turn pollution.
- * - UPGRADE: Re-wrote Circle System hooks to queue async execution, supporting multi-pulse skills.
+ * - UPGRADE: Re-wrote Circle System hooks to queue async execution.
  * - UPGRADE: Suppresses actor cast animations & skill banners during Circle End-of-Turn pulses.
+ * - UPGRADE: Migrated Fighter MP restoration math to UI payload callback for perfect HUD sync.
  */
 
 (() => {
@@ -197,8 +198,11 @@
             if (subject.isActor() && subject._classId === CONFIG.FIGHTER_CLASS_ID) {
                 const isTagged = item.note && item.note.match(/<dual wield hits>/i);
                 if (this.isAttack() || isTagged) {
-                    subject.setMp(subject.mp + 1); 
-                    subject.requestCustomTextPopup("1", "heal"); 
+                    
+                    // Delay MP math execution until the popup visually spawns
+                    subject.requestCustomTextPopup("1", "heal", () => {
+                        subject.setMp(subject.mp + 1);
+                    }); 
                 }
             }
 

@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 5: Cleric Class Mechanics v1.3
+ * @plugindesc Phase 5: Cleric Class Mechanics v1.4
  * @author Custom Build
  * * @help
  * Implements:
@@ -10,7 +10,7 @@
  * - Circle Registration: Use <circle: X> (X = Pulse Skill ID) and <duration: Y>.
  * - Circle Death Cleanse: Removes active circles when the caster dies.
  * - Circle of Immortality: Hard-caps lethal damage at target.hp - 1.
- * - REVERTED: Multi-skill array logic removed. Replaced by native MZ "Enemy & Ally" scope.
+ * - UPGRADE: Migrated Healer's Reward MP math to UI payload callback for perfect HUD sync.
  */
 
 (() => {
@@ -47,7 +47,6 @@
         
         const item = this.item();
         if (item && item.note) {
-            // Reverted back to single-integer parsing logic
             const circleMatch = item.note.match(/<circle:\s*(\d+)>/i);
             if (circleMatch) {
                 const pulseId = parseInt(circleMatch[1]);
@@ -118,8 +117,11 @@
         const subject = this.subject();
         
         if (this.isSkill() && actualHeal > 0 && subject.isActor() && subject._classId === CONFIG.CLERIC_CLASS_ID) {
-            subject.setMp(subject.mp + 1);
-            subject.requestCustomTextPopup("1", "heal");
+            
+            // Delay MP math execution until the popup visually spawns
+            subject.requestCustomTextPopup("1", "heal", () => {
+                subject.setMp(subject.mp + 1);
+            });
         }
     };
 
