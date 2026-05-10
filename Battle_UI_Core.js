@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 2: Battle UI & Sprite Architecture v1.53.
+ * @plugindesc Phase 2: Battle UI & Sprite Architecture v1.54.
  * @author Custom Build
  * * @help
  * Implements:
@@ -50,6 +50,7 @@
  * - FIX: Restored native wait command to displayAction after scope timing fix.
  * - UPGRADE: Arbitrary Text Popups migrated to UI Core. Supports payload callbacks for synced HUD updates.
  * - FIX: Injected explicit Status Window redraws triggered by payload execution for perfect 1:1 HUD sync.
+ * - UPGRADE: Context Window now reads live $gameSystem data for the Farmer Class seeds.
  */
 
 (() => {
@@ -301,11 +302,12 @@
         }
 
         const dummyElement = { name: "Fire", iconIndex: 97 };
-        const dummySeeds = [
-            { name: "Brandywine", turns: 3 },
-            { name: "Moon & Stars", turns: 1 },
-            { name: "Slimes", turns: 0 }
-        ];
+        
+        // Dynamically pull Farmer Seed Data
+        let liveFarmerSeeds = [];
+        if (isFarmer && $gameSystem._farmerSeeds) {
+            liveFarmerSeeds = $gameSystem._farmerSeeds.filter(s => s.planterId === actor.actorId());
+        }
 
         if (hasGun) {
             drawMode = "ammo";
@@ -315,7 +317,7 @@
             lines = 1;
         } else if (isFarmer) {
             drawMode = "farmer";
-            lines = dummySeeds.length > 0 ? dummySeeds.length : 1;
+            lines = liveFarmerSeeds.length > 0 ? liveFarmerSeeds.length : 1;
         }
 
         const newHeight = lines > 0 ? this.fittingHeight(lines) : 0;
@@ -346,15 +348,15 @@
             this.changeTextColor(ColorManager.normalColor());
             this.drawText(dummyElement.name, 36, 0, this.innerWidth - 36, "left");
         } else if (drawMode === "farmer") {
-            if (dummySeeds.length === 0) {
+            if (liveFarmerSeeds.length === 0) {
                 this.changeTextColor(ColorManager.systemColor());
                 this.drawText("No seeds planted", 0, 0, this.innerWidth, "center");
             } else {
-                for (let i = 0; i < dummySeeds.length; i++) {
+                for (let i = 0; i < liveFarmerSeeds.length; i++) {
                     const y = i * this.lineHeight();
                     this.changeTextColor(ColorManager.normalColor());
-                    this.drawText(dummySeeds[i].name, 0, y, this.innerWidth - 30, "left");
-                    this.drawText(dummySeeds[i].turns, 0, y, this.innerWidth - 4, "right");
+                    this.drawText(liveFarmerSeeds[i].name, 0, y, this.innerWidth - 30, "left");
+                    this.drawText(Math.max(0, liveFarmerSeeds[i].turns), 0, y, this.innerWidth - 4, "right");
                 }
             }
         }
@@ -711,10 +713,11 @@
         _Window_BattleLog_startAction.call(this, subject, action, targets);
     };
 
+    // Restored the native push("wait") command after scope fix
     const _Window_BattleLog_displayAction = Window_BattleLog.prototype.displayAction;
     Window_BattleLog.prototype.displayAction = function(subject, item) {
         const action = subject.currentAction();
-        if (action && action._isCirclePulse) return; 
+        if (action && action._isCirclePulse) return; // Silent execution for End-of-Turn pulses
         this.push("showBanner", item.name);
         this.push("wait"); 
     };
