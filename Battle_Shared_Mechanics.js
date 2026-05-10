@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 4: Shared Battle Mechanics v1.12
+ * @plugindesc Phase 4: Shared Battle Mechanics v1.13
  * @author Custom Build
  * * @help
  * Implements:
@@ -8,13 +8,13 @@
  * - Dual Wield Volley Split (<dual wield hits> or Basic Attacks).
  * - Action Sequencing (<random repeats: X-Y>, <random extra hit: Z>, <follow up X: Y%>).
  * - Fighter MP Regen (Restores 1 MP per successful normal/dual-wield hit).
- * - Battle Circle Registry (Backend array for Phase 5 Cleric/Martyr skills).
  * - Custom Skill Sort Order via <sort_order: x> tags.
- * - FIX: Eradicated restrictive 2H slot-locking logic to allow absolute Dual Wield freedom.
  * - FIX: Hooked Game_Action.clear() to wipe cached custom properties and prevent cross-turn pollution.
  * - UPGRADE: Re-wrote Circle System hooks to queue async execution.
  * - UPGRADE: Suppresses actor cast animations & skill banners during Circle End-of-Turn pulses.
  * - UPGRADE: Migrated Fighter MP restoration math to UI payload callback for perfect HUD sync.
+ * - UPGRADE: Globally hosts addCircle. Supports "type" params for independent Orb tracking.
+ * - UPGRADE: Async Turn Queue natively supports Betraying Shards (State 43).
  */
 
 (() => {
@@ -26,7 +26,9 @@
     const CONFIG = {
         FIGHTER_CLASS_ID: 1,
         AMMO_CRATE_STATE_ID: 29,
-        DUAL_WIELD_PENALTY: 0.75
+        DUAL_WIELD_PENALTY: 0.75,
+        BETRAYING_SHARDS_STATE_ID: 43,
+        BETRAYING_SHARDS_SKILL_ID: 107
     };
 
     //=============================================================================
@@ -198,8 +200,6 @@
             if (subject.isActor() && subject._classId === CONFIG.FIGHTER_CLASS_ID) {
                 const isTagged = item.note && item.note.match(/<dual wield hits>/i);
                 if (this.isAttack() || isTagged) {
-                    
-                    // Delay MP math execution until the popup visually spawns
                     subject.requestCustomTextPopup("1", "heal", () => {
                         subject.setMp(subject.mp + 1);
                     }); 
@@ -258,7 +258,7 @@
     };
 
     //=============================================================================
-    // 5. Circle System Async End-of-Turn Processing
+    // 5. Circle/Orb System Async End-of-Turn Processing
     //=============================================================================
     BattleManager._activeCircles = [];
 
@@ -268,6 +268,19 @@
 
     BattleManager.clearCircles = function() {
         this._activeCircles = [];
+    };
+
+    BattleManager.addCircle = function(caster, pulseSkillId, sourceSkillId, duration, type = "circle") {
+        if (!this._activeCircles) this._activeCircles = [];
+        // Allows Frost Orb and Circle to exist simultaneously via 'type' separation
+        this._activeCircles = this._activeCircles.filter(c => c.caster !== caster || (c.type && c.type !== type));
+        this._activeCircles.push({
+            caster: caster,
+            skillId: pulseSkillId, 
+            sourceSkillId: sourceSkillId,
+            duration: duration,
+            type: type
+        });
     };
 
     const _BattleManager_startTurn = BattleManager.startTurn;
@@ -288,28 +301,44 @@
         if (this._subject) {
             this.processTurn();
         } else {
-            // Evaluates Circles ONLY once the normal sequence of actions is entirely finished
+            
+            // Generate the Async Execution Queue once all actions are finished
             if (!this._circlesPulsedThisTurn) {
                 this._circlesPulsedThisTurn = true;
+                this._pendingCircles = [];
+                
+                // Load 1: Active Circles & Frost Orbs
                 if (this._activeCircles && this._activeCircles.length > 0) {
                     this._pendingCircles = [...this._activeCircles];
                     this._activeCircles.forEach(c => c.duration--);
                     this._activeCircles = this._activeCircles.filter(c => c.duration > 0 && c.caster.isAlive());
-                } else {
-                    this._pendingCircles = [];
                 }
+
+                // Load 2: Betraying Shards (State 43)
+                const allBattlers = $gameParty.aliveMembers().concat($gameTroop.aliveMembers());
+                allBattlers.forEach(b => {
+                    if (b.isStateAffected(CONFIG.BETRAYING_SHARDS_STATE_ID)) {
+                        this._pendingCircles.push({
+                            caster: b,
+                            skillId: CONFIG.BETRAYING_SHARDS_SKILL_ID,
+                            isShards: true
+                        });
+                    }
+                });
             }
             
-            // Sequentially pulls Pulses off the queue, waiting for each to finish before pulling the next
+            // Sequentially pulls Pulses/Shards off the queue
             if (this._pendingCircles && this._pendingCircles.length > 0) {
-                const circle = this._pendingCircles.shift();
-                if (circle.caster && circle.caster.isAlive()) {
-                    circle.caster.forceAction(circle.skillId, -1);
+                const pulse = this._pendingCircles.shift();
+                if (pulse.caster && pulse.caster.isAlive()) {
+                    pulse.caster.forceAction(pulse.skillId, -1);
                     
-                    const action = circle.caster.currentAction();
-                    if (action) action._isCirclePulse = true;
+                    const action = pulse.caster.currentAction();
                     
-                    BattleManager.forceAction(circle.caster);
+                    // Suppress animations strictly for Circles/Orbs. (Shards show full logs/animations).
+                    if (action && !pulse.isShards) action._isCirclePulse = true;
+                    
+                    BattleManager.forceAction(pulse.caster);
                 }
                 return; // Forces the engine to evaluate the action before allowing endTurn()
             }
@@ -318,7 +347,7 @@
         }
     };
 
-    // Intercept visual updates to suppress the Cleric's cast animation/banner
+    // Intercept visual updates to suppress cast animations/banners for Circles/Orbs
     const _Window_BattleLog_performActionStart = Window_BattleLog.prototype.performActionStart;
     Window_BattleLog.prototype.performActionStart = function(subject, action) {
         if (action && action._isCirclePulse) return; 

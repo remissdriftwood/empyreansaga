@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 2: Battle UI & Sprite Architecture v1.54.
+ * @plugindesc Phase 2: Battle UI & Sprite Architecture v1.56.
  * @author Custom Build
  * * @help
  * Implements:
@@ -51,6 +51,8 @@
  * - UPGRADE: Arbitrary Text Popups migrated to UI Core. Supports payload callbacks for synced HUD updates.
  * - FIX: Injected explicit Status Window redraws triggered by payload execution for perfect 1:1 HUD sync.
  * - UPGRADE: Context Window now reads live $gameSystem data for the Farmer Class seeds.
+ * - FIX: Native MP Heals (Color Type 3) now correctly pull the light gray healing color.
+ * - UPGRADE: Custom text popups now support frame-based delays to stagger overlapping visuals.
  */
 
 (() => {
@@ -529,7 +531,8 @@
     Sprite_Damage.prototype.damageFontSize = function() { return 16; };
 
     Sprite_Damage.prototype.damageColor = function() {
-        if (this._colorType === 1 || this._colorType === 2) {
+        // 0: HP Damage, 1: HP Heal, 2: MP Damage, 3: MP Heal
+        if (this._colorType === 1 || this._colorType === 3) {
             return ColorManager.textColor(20); 
         }
         return "#000000"; 
@@ -713,11 +716,10 @@
         _Window_BattleLog_startAction.call(this, subject, action, targets);
     };
 
-    // Restored the native push("wait") command after scope fix
     const _Window_BattleLog_displayAction = Window_BattleLog.prototype.displayAction;
     Window_BattleLog.prototype.displayAction = function(subject, item) {
         const action = subject.currentAction();
-        if (action && action._isCirclePulse) return; // Silent execution for End-of-Turn pulses
+        if (action && action._isCirclePulse) return; 
         this.push("showBanner", item.name);
         this.push("wait"); 
     };
@@ -1247,9 +1249,9 @@
     // 15. Embedded UI Patch: Arbitrary Text Popups (Multi-Line, Color Types & Payload Sync)
     //=============================================================================
 
-    Game_Battler.prototype.requestCustomTextPopup = function(text, colorType = "normal", payloadCallback = null) {
+    Game_Battler.prototype.requestCustomTextPopup = function(text, colorType = "normal", payloadCallback = null, delay = 0) {
         if (!this._customPopups) this._customPopups = [];
-        this._customPopups.push({ text: text, colorType: colorType, callback: payloadCallback });
+        this._customPopups.push({ text: text, colorType: colorType, callback: payloadCallback, delay: delay });
     };
 
     Game_Battler.prototype.isCustomTextPopupRequested = function() {
@@ -1259,25 +1261,32 @@
     const _Sprite_Battler_updateDamagePopup = Sprite_Battler.prototype.updateDamagePopup;
     Sprite_Battler.prototype.updateDamagePopup = function() {
         _Sprite_Battler_updateDamagePopup.call(this);
+        
         if (this._battler && this._battler.isCustomTextPopupRequested()) {
-            const popupData = this._battler._customPopups.shift(); 
-            const sprite = new Sprite_Damage();
-            sprite.x = this.x + this.damageOffsetX();
-            sprite.y = this.y + this.damageOffsetY();
-            sprite.setupArbitraryText(popupData.text, popupData.colorType);
-            this.parent.addChild(sprite);
-            this._damages.push(sprite);
+            // Tick down the delay timer without drawing the popup
+            if (this._battler._customPopups[0].delay > 0) {
+                this._battler._customPopups[0].delay--;
+            } else {
+                // Delay hit 0; spawn the popup and execute payload
+                const popupData = this._battler._customPopups.shift(); 
+                const sprite = new Sprite_Damage();
+                sprite.x = this.x + this.damageOffsetX();
+                sprite.y = this.y + this.damageOffsetY();
+                sprite.setupArbitraryText(popupData.text, popupData.colorType);
+                this.parent.addChild(sprite);
+                this._damages.push(sprite);
 
-            // Execute payload precisely when visual text drops
-            if (typeof popupData.callback === 'function') {
-                popupData.callback();
-                
-                // Force an immediate UI redraw for this specific battler
-                if (this._battler.isActor() && SceneManager._scene instanceof Scene_Battle) {
-                    const statusWindow = SceneManager._scene._statusWindow;
-                    if (statusWindow) {
-                        const index = $gameParty.battleMembers().indexOf(this._battler);
-                        if (index >= 0) statusWindow.redrawItem(index);
+                // Execute payload precisely when visual text drops
+                if (typeof popupData.callback === 'function') {
+                    popupData.callback();
+                    
+                    // Force an immediate UI redraw for this specific battler
+                    if (this._battler.isActor() && SceneManager._scene instanceof Scene_Battle) {
+                        const statusWindow = SceneManager._scene._statusWindow;
+                        if (statusWindow) {
+                            const index = $gameParty.battleMembers().indexOf(this._battler);
+                            if (index >= 0) statusWindow.redrawItem(index);
+                        }
                     }
                 }
             }
