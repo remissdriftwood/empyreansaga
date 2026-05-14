@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 2: Battle UI & Sprite Architecture v1.56.
+ * @plugindesc Phase 2: Battle UI & Sprite Architecture v1.57.
  * @author Custom Build
  * * @help
  * Implements:
@@ -53,6 +53,7 @@
  * - UPGRADE: Context Window now reads live $gameSystem data for the Farmer Class seeds.
  * - FIX: Native MP Heals (Color Type 3) now correctly pull the light gray healing color.
  * - UPGRADE: Custom text popups now support frame-based delays to stagger overlapping visuals.
+ * - UPGRADE: Cultivator Context Window now dynamically tracks and displays live imbued elements.
  */
 
 (() => {
@@ -302,8 +303,6 @@
                 }
             }
         }
-
-        const dummyElement = { name: "Fire", iconIndex: 97 };
         
         // Dynamically pull Farmer Seed Data
         let liveFarmerSeeds = [];
@@ -345,10 +344,20 @@
                 this.drawText(liveAmmoData[i].name, 36, y, this.innerWidth - 80, "left");
                 this.drawText(`${liveAmmoData[i].currentAmmo}/${liveAmmoData[i].maxAmmo}`, 0, y, this.innerWidth - 4, "right");
             }
+            
         } else if (drawMode === "cultivator") {
-            this.drawIcon(dummyElement.iconIndex, 0, 2);
-            this.changeTextColor(ColorManager.normalColor());
-            this.drawText(dummyElement.name, 36, 0, this.innerWidth - 36, "left");
+            const el = actor._cultivatorElement;
+            if (el) {
+                const icons = { water: 95, fire: 97, wood: 130, earth: 96, metal: 16 };
+                const names = { water: "Water", fire: "Fire", wood: "Wood", earth: "Earth", metal: "Metal" };
+                this.drawIcon(icons[el] || 0, 0, 2);
+                this.changeTextColor(ColorManager.normalColor());
+                this.drawText(names[el] || "Unknown", 36, 0, this.innerWidth - 36, "left");
+            } else {
+                this.changeTextColor(ColorManager.systemColor());
+                this.drawText("No Element", 0, 0, this.innerWidth, "center");
+            }
+            
         } else if (drawMode === "farmer") {
             if (liveFarmerSeeds.length === 0) {
                 this.changeTextColor(ColorManager.systemColor());

@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 5: Knight Class Mechanics v1.1
+ * @plugindesc Phase 5: Knight Class Mechanics v1.2
  * @author Custom Build
  * * @help
  * Implements:
@@ -11,7 +11,7 @@
  * - Heal Guard (State 34): Intercepts all attacks meant for the guarded ally.
  * - Feedback (State 70): Absorbs all HP damage taken and deals it to the target at EOT.
  * - Custom Block (Skill 155): Overwrites native Guard command for the Knight.
- * * NOTE: Feedback damage formula is adjustable in the CONFIG block below.
+ * - Custom Block Heal: Intercepts native MP heal to spawn custom `+X` text popup.
  */
 
 (() => {
@@ -126,24 +126,34 @@
     };
 
     //=============================================================================
-    // 5. Feedback Registration & Battery Hooks
+    // 5. Feedback Registration, Battery Hooks & Database MP Intercept
     //=============================================================================
     
-    // A. Register the targeted enemy when Feedback is cast
     const _Game_Action_apply = Game_Action.prototype.apply;
     Game_Action.prototype.apply = function(target) {
         _Game_Action_apply.call(this, target);
         
         if (this.subject().isActor() && this.subject()._classId === CONFIG.KNIGHT_CLASS_ID) {
-            // If the skill applied the Feedback state to the Knight, log the target
+            
+            // A. Log Feedback target
             if (target.result().isHit() && this.item().effects.some(e => e.code === 21 && e.dataId === CONFIG.FEEDBACK_STATE_ID)) {
                 this.subject()._feedbackTarget = target;
                 this.subject()._feedbackPool = 0; 
             }
+            
+            // B. Intercept Block MP Recovery (Skill 155) to customize the popup
+            if (this.item().id === CONFIG.BLOCK_SKILL_ID) {
+                const res = target.result();
+                if (res.mpDamage < 0) { // Negative damage = Heal
+                    const recovered = -res.mpDamage;
+                    res.mpDamage = 0; // Erase the native blue/black popup from the queue
+                    target.requestCustomTextPopup("+" + recovered, "heal"); // Spawn custom grey +X
+                }
+            }
         }
     };
 
-    // B. Intercept HP Damage to charge batteries & nullify Hamburger instant damage
+    // Intercept HP Damage to charge batteries & nullify Hamburger instant damage
     const _Game_Action_executeHpDamage = Game_Action.prototype.executeHpDamage;
     Game_Action.prototype.executeHpDamage = function(target, value) {
         

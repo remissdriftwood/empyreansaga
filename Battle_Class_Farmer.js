@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 5: Farmer Class Mechanics v1.2
+ * @plugindesc Phase 5: Farmer Class Mechanics v1.3
  * @author Custom Build
  * * @help
  * Implements:
@@ -10,6 +10,7 @@
  * - Hooked Harvesting: Deletes the seed and payloads +1 MP seamlessly.
  * - Dispel Moonstars (Skill 67): Strips non-persistent/immune states from Allies.
  * - FIX: Enforced strict Number() casting on all ID checks to prevent string-math failures.
+ * - FIX: Appended '+' to custom MP restoration popups.
  */
 
 (() => {
@@ -58,7 +59,6 @@
         
         if (this._classId === CONFIG.FARMER_CLASS_ID) {
             for (const itemId in CONFIG.SEEDS) {
-                // Outer check ensures skill drops completely if the item is lost
                 if ($gameParty.hasItem($dataItems[Number(itemId)])) {
                     
                     const entry = CONFIG.SEEDS[itemId];
@@ -68,7 +68,6 @@
                     
                     let seed = null;
                     if ($gameSystem._farmerSeeds) {
-                        // Strict Number matching prevents MZ stringification failures
                         seed = $gameSystem._farmerSeeds.find(s => Number(s.planterId) === actorId && Number(s.plantId) === plantId);
                     }
                     
@@ -97,15 +96,12 @@
             const item = action.item();
             const subject = this._subject;
             
-            // Farmer-Specific Execution
             if (subject.isActor() && subject._classId === CONFIG.FARMER_CLASS_ID) {
                 
-                // Check if it was a Plant Skill
                 const plantEntry = Object.values(CONFIG.SEEDS).find(s => Number(s.plant) === Number(item.id));
                 if (plantEntry) {
                     if (!$gameSystem._farmerSeeds) $gameSystem._farmerSeeds = [];
                     
-                    // Prevent planting duplicates of the exact same seed
                     const existing = $gameSystem._farmerSeeds.find(s => Number(s.planterId) === Number(subject.actorId()) && Number(s.plantId) === Number(plantEntry.plant));
                     
                     if (!existing) {
@@ -126,7 +122,6 @@
                     }
                 }
                 
-                // Check if it was a Harvest Skill
                 const harvestEntry = Object.values(CONFIG.SEEDS).find(s => Number(s.harvest) === Number(item.id));
                 if (harvestEntry) {
                     if ($gameSystem._farmerSeeds) {
@@ -136,14 +131,12 @@
                         }
                     }
                     
-                    // Reward exactly +1 MP for the execution of the harvest skill
-                    subject.requestCustomTextPopup("1", "heal", () => {
+                    subject.requestCustomTextPopup("+1", "heal", () => {
                         subject.setMp(subject.mp + 1);
                     });
                 }
             }
 
-            // Moon & Stars Dispel Hook (Executes cleanly regardless of Scope)
             if (Number(item.id) === CONFIG.MOONSTARS_HARVEST_ID) {
                 $gameParty.aliveMembers().forEach(battler => {
                     battler.states().forEach(state => {
@@ -184,7 +177,6 @@
                 const itemId = parseInt(match[1]);
                 const hasFarmer = $gameParty.members().some(actor => actor._classId === CONFIG.FARMER_CLASS_ID);
                 
-                // Hide if no farmer, OR hide if the party already owns the item
                 if (!hasFarmer) return false;
                 if ($gameParty.hasItem($dataItems[itemId])) return false;
             }

@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 5: Chemist Class Mechanics v1.0
+ * @plugindesc Phase 5: Chemist Class Mechanics v1.1
  * @author Custom Build
  * * @help
  * Implements:
@@ -15,6 +15,7 @@
  * - Combat Item Tracking: Refunds all consumed items at the end of battle.
  * - Fertilizer (Item 12): Subtracts 1 turn from Farmer Seed arrays.
  * - Martyr's Joy (State 68): Forces Death State upon reaching 0 turns.
+ * - FIX: Appended '+' to custom MP restoration popups.
  */
 
 (() => {
@@ -56,7 +57,6 @@
     Game_Battler.prototype.addState = function(stateId) {
         const mixIds = Object.values(CONFIG.MIX_STATES);
         
-        // If a new Mix State is being applied, strip all other existing Mixes
         if (mixIds.includes(stateId)) {
             mixIds.forEach(id => {
                 if (id !== stateId && this.isStateAffected(id)) {
@@ -83,7 +83,7 @@
             // False Alchemy Check
             if (this.isStateAffected(CONFIG.MIX_STATES.false_alchemy)) {
                 if (this.isActor() && this._classId === CONFIG.CHEMIST_CLASS_ID) {
-                    this.requestCustomTextPopup("1", "heal", () => {
+                    this.requestCustomTextPopup("+1", "heal", () => {
                         this.setMp(this.mp + 1);
                     });
                 }
@@ -96,7 +96,7 @@
 
             // Standard MP Regen for Chemist (Using any item normally)
             if (this.isActor() && this._classId === CONFIG.CHEMIST_CLASS_ID) {
-                this.requestCustomTextPopup("1", "heal", () => {
+                this.requestCustomTextPopup("+1", "heal", () => {
                     this.setMp(this.mp + 1);
                 });
             }
@@ -122,9 +122,8 @@
     Game_Action.prototype.needsSelection = function() {
         if (this.isItem() && this.subject().isStateAffected(CONFIG.MIX_STATES.diluent)) {
             const scope = this.item().scope;
-            // Native Scopes: 1 (One Enemy), 7 (One Ally), 9 (One Dead Ally)
             if (scope === 1 || scope === 7 || scope === 9) {
-                return false; // Tells the UI to skip the selection window entirely
+                return false; 
             }
         }
         return _Game_Action_needsSelection.call(this);

@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 4: Shared Battle Mechanics v1.13
+ * @plugindesc Phase 4: Shared Battle Mechanics v1.15
  * @author Custom Build
  * * @help
  * Implements:
@@ -15,6 +15,8 @@
  * - UPGRADE: Migrated Fighter MP restoration math to UI payload callback for perfect HUD sync.
  * - UPGRADE: Globally hosts addCircle. Supports "type" params for independent Orb tracking.
  * - UPGRADE: Async Turn Queue natively supports Betraying Shards (State 43).
+ * - FIX: Appended '+' to custom MP restoration popups.
+ * - UPGRADE: Async Turn Queue natively supports Cultivator Sword on a String (State 60).
  */
 
 (() => {
@@ -28,7 +30,8 @@
         AMMO_CRATE_STATE_ID: 29,
         DUAL_WIELD_PENALTY: 0.75,
         BETRAYING_SHARDS_STATE_ID: 43,
-        BETRAYING_SHARDS_SKILL_ID: 107
+        BETRAYING_SHARDS_SKILL_ID: 107,
+        SWORD_STRING_STATE_ID: 60 
     };
 
     //=============================================================================
@@ -200,7 +203,7 @@
             if (subject.isActor() && subject._classId === CONFIG.FIGHTER_CLASS_ID) {
                 const isTagged = item.note && item.note.match(/<dual wield hits>/i);
                 if (this.isAttack() || isTagged) {
-                    subject.requestCustomTextPopup("1", "heal", () => {
+                    subject.requestCustomTextPopup("+1", "heal", () => {
                         subject.setMp(subject.mp + 1);
                     }); 
                 }
@@ -272,7 +275,6 @@
 
     BattleManager.addCircle = function(caster, pulseSkillId, sourceSkillId, duration, type = "circle") {
         if (!this._activeCircles) this._activeCircles = [];
-        // Allows Frost Orb and Circle to exist simultaneously via 'type' separation
         this._activeCircles = this._activeCircles.filter(c => c.caster !== caster || (c.type && c.type !== type));
         this._activeCircles.push({
             caster: caster,
@@ -302,19 +304,16 @@
             this.processTurn();
         } else {
             
-            // Generate the Async Execution Queue once all actions are finished
             if (!this._circlesPulsedThisTurn) {
                 this._circlesPulsedThisTurn = true;
                 this._pendingCircles = [];
                 
-                // Load 1: Active Circles & Frost Orbs
                 if (this._activeCircles && this._activeCircles.length > 0) {
                     this._pendingCircles = [...this._activeCircles];
                     this._activeCircles.forEach(c => c.duration--);
                     this._activeCircles = this._activeCircles.filter(c => c.duration > 0 && c.caster.isAlive());
                 }
 
-                // Load 2: Betraying Shards (State 43)
                 const allBattlers = $gameParty.aliveMembers().concat($gameTroop.aliveMembers());
                 allBattlers.forEach(b => {
                     if (b.isStateAffected(CONFIG.BETRAYING_SHARDS_STATE_ID)) {
@@ -324,10 +323,17 @@
                             isShards: true
                         });
                     }
+                    
+                    if (b.isActor() && b.isStateAffected(CONFIG.SWORD_STRING_STATE_ID)) {
+                        this._pendingCircles.push({
+                            caster: b,
+                            skillId: b.attackSkillId(),
+                            isSword: true
+                        });
+                    }
                 });
             }
             
-            // Sequentially pulls Pulses/Shards off the queue
             if (this._pendingCircles && this._pendingCircles.length > 0) {
                 const pulse = this._pendingCircles.shift();
                 if (pulse.caster && pulse.caster.isAlive()) {
@@ -335,19 +341,17 @@
                     
                     const action = pulse.caster.currentAction();
                     
-                    // Suppress animations strictly for Circles/Orbs. (Shards show full logs/animations).
-                    if (action && !pulse.isShards) action._isCirclePulse = true;
+                    if (action && !pulse.isShards && !pulse.isSword) action._isCirclePulse = true;
                     
                     BattleManager.forceAction(pulse.caster);
                 }
-                return; // Forces the engine to evaluate the action before allowing endTurn()
+                return;
             }
             
             this.endTurn();
         }
     };
 
-    // Intercept visual updates to suppress cast animations/banners for Circles/Orbs
     const _Window_BattleLog_performActionStart = Window_BattleLog.prototype.performActionStart;
     Window_BattleLog.prototype.performActionStart = function(subject, action) {
         if (action && action._isCirclePulse) return; 

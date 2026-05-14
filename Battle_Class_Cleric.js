@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 5: Cleric Class Mechanics v1.4
+ * @plugindesc Phase 5: Cleric Class Mechanics v1.5
  * @author Custom Build
  * * @help
  * Implements:
@@ -11,6 +11,7 @@
  * - Circle Death Cleanse: Removes active circles when the caster dies.
  * - Circle of Immortality: Hard-caps lethal damage at target.hp - 1.
  * - UPGRADE: Migrated Healer's Reward MP math to UI payload callback for perfect HUD sync.
+ * - FIX: Appended '+' to custom MP restoration popups.
  */
 
 (() => {
@@ -31,7 +32,6 @@
     
     BattleManager.addCircle = function(caster, pulseSkillId, sourceSkillId, duration) {
         if (!this._activeCircles) this._activeCircles = [];
-        // Strictly prevent multiple circles from the same caster by overwriting
         this._activeCircles = this._activeCircles.filter(c => c.caster !== caster);
         this._activeCircles.push({
             caster: caster,
@@ -118,8 +118,7 @@
         
         if (this.isSkill() && actualHeal > 0 && subject.isActor() && subject._classId === CONFIG.CLERIC_CLASS_ID) {
             
-            // Delay MP math execution until the popup visually spawns
-            subject.requestCustomTextPopup("1", "heal", () => {
+            subject.requestCustomTextPopup("+1", "heal", () => {
                 subject.setMp(subject.mp + 1);
             });
         }
