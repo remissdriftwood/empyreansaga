@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 5: Mimic Class Mechanics v1.2
+ * @plugindesc Phase 5: Mimic Class Mechanics v1.4
  * @author Custom Build
  * * @command StartMimicDialogue
  * @text Start Mimic Dialogue
@@ -33,7 +33,8 @@
     //=============================================================================
     const CONFIG = {
         MIMIC_CLASS_ID: 8, 
-        RATING_MULTIPLIER: 0.25 
+        RATING_MULTIPLIER: 0.25,
+        EXCLUDED_SKILLS: [160] // Array of skill IDs to skip when mimicking
     };
 
     //=============================================================================
@@ -41,7 +42,8 @@
     //=============================================================================
     PluginManager.registerCommand("Battle_Class_Mimic", "StartMimicDialogue", args => {
         const enemyId = Number(args.enemyId);
-        const mimics = $gameParty.members().filter(a => a._classId === CONFIG.MIMIC_CLASS_ID);
+        // Ensure only alive Mimics can transform
+        const mimics = $gameParty.members().filter(a => a._classId === CONFIG.MIMIC_CLASS_ID && a.isAlive());
         
         if (mimics.length > 0 && enemyId > 0) {
             SceneManager.push(Scene_MimicMap);
@@ -61,7 +63,6 @@
     Game_Actor.prototype.transformIntoMimic = function(enemyId) {
         this._mimickedEnemyId = enemyId;
         this.clearEquipments();
-        this.setMp(this.mmp); // Restore MP on transformation
         
         // Natively update graphics to prevent SV rendering cache issues
         const enemy = $dataEnemies[enemyId];
@@ -99,6 +100,8 @@
             this.setBattlerImage(battlerName);
         }
         
+        // Apply full HP/MP restore and cure ailments after stat recalculation
+        this.recoverAll();
         this.refresh();
     };
 
@@ -172,9 +175,7 @@
         return _Game_Actor_battlerName.call(this);
     };
 
-    //=============================================================================
     // Class Name Intercept (Global Data Override)
-    //=============================================================================
     const _Game_Actor_currentClass = Game_Actor.prototype.currentClass;
     Game_Actor.prototype.currentClass = function() {
         const baseClass = _Game_Actor_currentClass.call(this);
@@ -199,7 +200,9 @@
         let skills = _Game_Actor_addedSkills.call(this);
         if (this._classId === CONFIG.MIMIC_CLASS_ID && this._mimickedEnemyId) {
             const enemy = $dataEnemies[this._mimickedEnemyId];
-            const enemySkills = enemy.actions.map(a => a.skillId).filter(id => id > 0);
+            const enemySkills = enemy.actions
+                .map(a => a.skillId)
+                .filter(id => id > 0 && !CONFIG.EXCLUDED_SKILLS.includes(id));
             const uniqueSkills = [...new Set(enemySkills)];
             skills = skills.concat(uniqueSkills);
         }
@@ -256,7 +259,7 @@
 
     const _BattleManager_displayVictoryMessage = BattleManager.displayVictoryMessage;
     BattleManager.displayVictoryMessage = function() {
-        const mimics = $gameParty.members().filter(a => a._classId === CONFIG.MIMIC_CLASS_ID);
+        const mimics = $gameParty.members().filter(a => a._classId === CONFIG.MIMIC_CLASS_ID && a.isAlive());
         
         if (mimics.length > 0 && $gameTemp._lastKilledEnemyId) {
             const targetEnemyId = $gameTemp._lastKilledEnemyId;
@@ -316,10 +319,10 @@
         Window_MenuStatus.prototype.initialize.call(this, rect);
     };
     Window_MimicSelect.prototype.maxItems = function() {
-        return $gameParty.members().filter(a => a._classId === CONFIG.MIMIC_CLASS_ID).length;
+        return $gameParty.members().filter(a => a._classId === CONFIG.MIMIC_CLASS_ID && a.isAlive()).length;
     };
     Window_MimicSelect.prototype.actor = function(index) {
-        return $gameParty.members().filter(a => a._classId === CONFIG.MIMIC_CLASS_ID)[index];
+        return $gameParty.members().filter(a => a._classId === CONFIG.MIMIC_CLASS_ID && a.isAlive())[index];
     };
 
     function Window_MimicSkills() { this.initialize(...arguments); }
@@ -330,7 +333,10 @@
     };
     Window_MimicSkills.prototype.setEnemy = function(enemyId) {
         const enemy = $dataEnemies[enemyId];
-        const skillIds = [...new Set(enemy.actions.map(a => a.skillId).filter(id => id > 0))];
+        const skillIds = [...new Set(enemy.actions
+            .map(a => a.skillId)
+            .filter(id => id > 0 && !CONFIG.EXCLUDED_SKILLS.includes(id))
+        )];
         this._skills = skillIds.map(id => $dataSkills[id]);
         this.refresh();
     };
@@ -393,7 +399,7 @@
             this._mimicPromptWindow.hide();
             this._mimicPromptWindow.deactivate();
             
-            const mimics = $gameParty.members().filter(a => a._classId === CONFIG.MIMIC_CLASS_ID);
+            const mimics = $gameParty.members().filter(a => a._classId === CONFIG.MIMIC_CLASS_ID && a.isAlive());
             if (mimics.length > 1) {
                 this._mimicSelectWindow.refresh();
                 this._mimicSelectWindow.show();
@@ -443,7 +449,7 @@
             this._mimicConfirmWindow.hide();
             this._mimicConfirmWindow.deactivate();
             
-            const mimics = $gameParty.members().filter(a => a._classId === CONFIG.MIMIC_CLASS_ID);
+            const mimics = $gameParty.members().filter(a => a._classId === CONFIG.MIMIC_CLASS_ID && a.isAlive());
             if (mimics.length > 1) {
                 this._mimicSelectWindow.show();
                 this._mimicSelectWindow.activate();
