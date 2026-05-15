@@ -205,8 +205,15 @@
         const textStartY = rect.y + 12; 
         
         this.drawCharacter(charName, charIndex, charX, charY);
+
+        // --- NEW FONT LOGIC ---
+        // Change to the custom Number Font for the Class Name
+        this.contents.fontFace = $gameSystem.numberFontFace();
         this.changeTextColor(ColorManager.normalColor());
         this.drawText(classData.name.trim(), textX, textStartY, rect.width - textX);
+        
+        // Reset back to standard font for the description text
+        this.resetFontSettings();
         
         const description = dbClass.meta.MP_Help ? String(dbClass.meta.MP_Help).trim() : "";
         this.changeTextColor(ColorManager.textColor(16));

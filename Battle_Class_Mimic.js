@@ -172,17 +172,25 @@
         return _Game_Actor_battlerName.call(this);
     };
 
-    // Class Name Intercept
-    const _Window_Base_drawActorClass = Window_Base.prototype.drawActorClass;
-    Window_Base.prototype.drawActorClass = function(actor, x, y, width) {
-        if (actor._classId === CONFIG.MIMIC_CLASS_ID && actor._mimickedEnemyId) {
-            const enemy = $dataEnemies[actor._mimickedEnemyId];
-            const name = getMimicMeta(enemy, "ClassName") || enemy.name;
-            this.resetTextColor();
-            this.drawText(name, x, y, width);
-        } else {
-            _Window_Base_drawActorClass.call(this, actor, x, y, width);
+    //=============================================================================
+    // Class Name Intercept (Global Data Override)
+    //=============================================================================
+    const _Game_Actor_currentClass = Game_Actor.prototype.currentClass;
+    Game_Actor.prototype.currentClass = function() {
+        const baseClass = _Game_Actor_currentClass.call(this);
+        
+        if (this._classId === CONFIG.MIMIC_CLASS_ID && this._mimickedEnemyId) {
+            const enemy = $dataEnemies[this._mimickedEnemyId];
+            if (enemy) {
+                // Shallow clone the class to avoid permanently modifying the database
+                const dynamicClass = Object.assign({}, baseClass);
+                const customName = getMimicMeta(enemy, "ClassName");
+                dynamicClass.name = customName ? customName.trim() : enemy.name;
+                return dynamicClass;
+            }
         }
+        
+        return baseClass;
     };
 
     // Skill Intercept
