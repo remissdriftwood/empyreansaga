@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 6: Beadle Character Creation Flow v1.14
+ * @plugindesc Phase 6: Beadle Character Creation Flow v1.17
  * @author Custom Build
  * * @command startCreation
  * @text Start Beadle Creation
@@ -18,7 +18,8 @@
  * 4. Confirm (Displays Core_Engine's 16-bit Window_Status layout).
  * * Replaces the first available placeholder actor ("??????") in slots 1-4.
  * Auto-scales level to the party's average.
- * * UPDATE v1.14: Natively supports Mimic class (ID 8) dynamic transformations.
+ * * UPDATE v1.17: Natively sets SV battler strings to fix "None" caching.
+ * Case-insensitive parsing applied to enemy visual notetags.
  */
 
 (() => {
@@ -31,7 +32,6 @@
         PLACEHOLDER_NAME: "??????",
         PARTY_SLOTS: [1, 2, 3, 4],
         
-        // Map Database Class IDs to their name and Face index on PCs1_XX.png
         CLASSES: [
             { id: 1, name: "Fighter", faceIndex: 0 },
             { id: 2, name: "Cleric", faceIndex: 1 },
@@ -40,15 +40,14 @@
             { id: 5, name: "Chemist", faceIndex: 4 },
             { id: 6, name: "Cultivator", faceIndex: 6 }, 
             { id: 7, name: "Knight", faceIndex: 5 },
-            { id: 8, name: "Mimic", faceIndex: 0 } // Face intercepted dynamically
+            { id: 8, name: "Mimic", faceIndex: 0 } 
         ],
         
-        // Class ID : [{ item ID, amount }]
         STARTING_ITEMS: {
-            4: [{ id: 17, amount: 1 }] // Farmer gets Brandywine Seed
+            4: [{ id: 17, amount: 1 }] 
         },
 
-        MIMIC_STARTING_ENEMIES: [2, 3, 4, 5] // Enemy IDs for Mimic forms
+        MIMIC_STARTING_ENEMIES: [2, 3, 4, 5] 
     };
 
     //=============================================================================
@@ -79,7 +78,12 @@
     // 2. Custom Sprites & Windows
     //=============================================================================
 
-    // --- Custom Animated Style Preview Sprite ---
+    function getMimicMeta(enemy, tag) {
+        if (!enemy || !enemy.meta) return null;
+        const key = Object.keys(enemy.meta).find(k => k.toLowerCase() === tag.toLowerCase());
+        return key ? String(enemy.meta[key]) : null;
+    }
+
     function Sprite_StylePreview() { this.initialize(...arguments); }
     Sprite_StylePreview.prototype = Object.create(Sprite.prototype);
     Sprite_StylePreview.prototype.constructor = Sprite_StylePreview;
@@ -92,8 +96,9 @@
         this.anchor.y = 1.0; 
     };
 
-    Sprite_StylePreview.prototype.setCharacter = function(charName) {
+    Sprite_StylePreview.prototype.setCharacter = function(charName, charIndex = 0) {
         this._charName = charName;
+        this._characterIndex = charIndex;
         this.bitmap = ImageManager.loadCharacter(charName);
         this._animationCount = 0;
         this._pattern = 0;
@@ -121,12 +126,21 @@
         const cw = this.bitmap.width / (isBig ? 3 : 12);
         const ch = this.bitmap.height / (isBig ? 4 : 8);
         const pat = [0, 1, 2, 1][this._pattern];
-        const cx = pat * cw;
-        const cy = 0; 
+        
+        let cx = pat * cw;
+        let cy = 0; 
+        
+        if (!isBig) {
+            const index = this._characterIndex || 0;
+            const sheetX = (index % 4) * 3;
+            const sheetY = Math.floor(index / 4) * 4;
+            cx = (sheetX + pat) * cw;
+            cy = sheetY * ch; 
+        }
+        
         this.setFrame(cx, cy, cw, ch);
     };
 
-    // --- Class Select Window ---
     function Window_BeadleClass() { this.initialize(...arguments); }
     Window_BeadleClass.prototype = Object.create(Window_Command.prototype);
     Window_BeadleClass.prototype.constructor = Window_BeadleClass;
@@ -144,9 +158,7 @@
         Window_Command.prototype.initialize.call(this, rect);
     };
 
-    Window_BeadleClass.prototype.itemHeight = function() { 
-        return 72; 
-    };
+    Window_BeadleClass.prototype.itemHeight = function() { return 72; };
 
     Window_BeadleClass.prototype.makeCommandList = function() {
         CONFIG.CLASSES.forEach(c => this.addCommand(c.name, 'class', true, c));
@@ -160,18 +172,27 @@
         const rect = this.itemRect(index); 
         const classData = this._list[index].ext;
         let charName = "";
+        let charIndex = 0;
         
         if (classData.id === 8) {
             const enemyId = this._randomStyles[classData.id];
             const enemy = $dataEnemies[enemyId];
-            charName = enemy ? "$enemy_" + enemy.name.replace(/\s+/g, '') + "_01" : "";
+            if (enemy) {
+                const charTag = getMimicMeta(enemy, "Character");
+                if (charTag) {
+                    const parts = charTag.split(',');
+                    charName = parts[0].trim();
+                    charIndex = parseInt(parts[1]) || 0;
+                } else {
+                    charName = `$enemy_${enemy.name.replace(/\s+/g, '')}_01`;
+                }
+            }
         } else {
             const styleNum = this._randomStyles[classData.id].toString().padStart(2, '0');
             charName = "$" + classData.name.toLowerCase() + "_" + styleNum;
         }
 
         const dbClass = $dataClasses[classData.id];
-        
         const bitmap = ImageManager.loadCharacter(charName);
         if (!bitmap.isReady()) {
             bitmap.addLoadListener(() => this.refresh()); 
@@ -183,8 +204,7 @@
         const charY = rect.y + 60; 
         const textStartY = rect.y + 12; 
         
-        this.drawCharacter(charName, 0, charX, charY);
-        
+        this.drawCharacter(charName, charIndex, charX, charY);
         this.changeTextColor(ColorManager.normalColor());
         this.drawText(classData.name.trim(), textX, textStartY, rect.width - textX);
         
@@ -194,7 +214,6 @@
         this.resetTextColor();
     };
 
-    // --- Style Select Window ---
     function Window_BeadleStyle() { this.initialize(...arguments); }
     Window_BeadleStyle.prototype = Object.create(Window_Selectable.prototype);
     Window_BeadleStyle.prototype.constructor = Window_BeadleStyle;
@@ -202,13 +221,11 @@
     Window_BeadleStyle.prototype.initialize = function(rect) {
         Window_Selectable.prototype.initialize.call(this, rect);
     };
-
     Window_BeadleStyle.prototype.maxItems = function() { return 4; };
     Window_BeadleStyle.prototype.maxCols = function() { return 4; };
     Window_BeadleStyle.prototype.itemHeight = function() { return this.innerHeight; };
     Window_BeadleStyle.prototype.drawItem = function(index) {}; 
 
-    // --- Label Window ---
     function Window_CreationLabel() { this.initialize(...arguments); }
     Window_CreationLabel.prototype = Object.create(Window_Base.prototype);
     Window_CreationLabel.prototype.constructor = Window_CreationLabel;
@@ -226,33 +243,20 @@
         }
     };
 
-    // --- Confirm Command Window ---
     function Window_BeadleConfirm() { this.initialize(...arguments); }
     Window_BeadleConfirm.prototype = Object.create(Window_Command.prototype);
     Window_BeadleConfirm.prototype.constructor = Window_BeadleConfirm;
 
-    Window_BeadleConfirm.prototype.initialize = function(rect) {
-        Window_Command.prototype.initialize.call(this, rect);
-    };
+    Window_BeadleConfirm.prototype.initialize = function(rect) { Window_Command.prototype.initialize.call(this, rect); };
+    Window_BeadleConfirm.prototype.makeCommandList = function() { this.addCommand("Yes", 'yes'); this.addCommand("No", 'no'); };
+    Window_BeadleConfirm.prototype.itemTextAlign = function() { return 'center'; };
 
-    Window_BeadleConfirm.prototype.makeCommandList = function() {
-        this.addCommand("Yes", 'yes');
-        this.addCommand("No", 'no');
-    };
-
-    Window_BeadleConfirm.prototype.itemTextAlign = function() {
-        return 'center';
-    };
-
-    // --- Window_NameInput Compatibility Overrides ---
     if (Window_NameInput.LATIN1) Window_NameInput.LATIN1[88] = " ";
     if (Window_NameInput.LATIN2) Window_NameInput.LATIN2[88] = " ";
-    
     Window_NameInput.prototype.processJump = function() {};
     Window_NameInput.prototype.processPagedown = function() {};
     Window_NameInput.prototype.processPageup = function() {};
 
-    // --- Window_NameEdit Layout Overrides ---
     Window_NameEdit.prototype.left = function() {
         const totalWidth = this._maxLength * this.charWidth();
         return Math.floor((this.innerWidth - totalWidth) / 2);
@@ -261,19 +265,13 @@
     Window_NameEdit.prototype.itemRect = function(index) {
         const x = this.left() + index * this.charWidth();
         const y = Math.floor((this.innerHeight - this.lineHeight()) / 2);
-        const width = this.charWidth();
-        const height = this.lineHeight();
-        return new Rectangle(x, y, width, height);
+        return new Rectangle(x, y, this.charWidth(), this.lineHeight());
     };
 
     Window_NameEdit.prototype.refresh = function() {
         this.contents.clear();
-        for (let i = 0; i < this._maxLength; i++) {
-            this.drawUnderline(i);
-        }
-        for (let j = 0; j < this._name.length; j++) {
-            this.drawChar(j);
-        }
+        for (let i = 0; i < this._maxLength; i++) this.drawUnderline(i);
+        for (let j = 0; j < this._name.length; j++) this.drawChar(j);
         const rect = this.itemRect(this._index);
         this.setCursorRect(rect.x, rect.y, rect.width, rect.height);
     };
@@ -295,11 +293,9 @@
         this._targetActorId = actorId;
         this._canCancel = canCancel;
         this._dummyActor = JsonEx.makeDeepCopy($gameActors.actor(actorId));
-        
         this._dummyActor.setCharacterImage("", 0);
         this._dummyActor.setFaceImage("", 0);
         this._dummyActor.setBattlerImage("");
-        
         this._chosenClassData = null;
         this._chosenStyleString = "01";
     };
@@ -322,8 +318,7 @@
     Scene_BeadleCreate.prototype.createClassWindow = function() {
         const wy = this._labelWindow.y + this._labelWindow.height;
         const wh = Graphics.boxHeight - wy;
-        const ww = Graphics.boxWidth; 
-        this._classWindow = new Window_BeadleClass(new Rectangle(0, wy, ww, wh));
+        this._classWindow = new Window_BeadleClass(new Rectangle(0, wy, Graphics.boxWidth, wh));
         this._classWindow.setHandler('ok', this.onClassOk.bind(this));
         if (this._canCancel) this._classWindow.setHandler('cancel', this.popScene.bind(this));
         this.addWindow(this._classWindow);
@@ -331,9 +326,7 @@
 
     Scene_BeadleCreate.prototype.createStyleWindow = function() {
         const wy = this._labelWindow.y + this._labelWindow.height;
-        const ww = Graphics.boxWidth;
-        const wh = 120;
-        this._styleWindow = new Window_BeadleStyle(new Rectangle(0, wy, ww, wh));
+        this._styleWindow = new Window_BeadleStyle(new Rectangle(0, wy, Graphics.boxWidth, 120));
         this._styleWindow.setHandler('ok', this.onStyleOk.bind(this));
         this._styleWindow.setHandler('cancel', this.onStyleCancel.bind(this));
         this._styleWindow.hide();
@@ -351,24 +344,17 @@
 
     Scene_BeadleCreate.prototype.createNameWindows = function() {
         const labelH = this.calcWindowHeight(1, false);
-        
-        const padding = typeof $gameSystem !== "undefined" ? $gameSystem.windowPadding() : 12;
-        const faceH = ImageManager.faceHeight || 144;
-        const editH = faceH + (padding * 2); 
-        
+        const editH = (ImageManager.faceHeight || 144) + ((typeof $gameSystem !== "undefined" ? $gameSystem.windowPadding() : 12) * 2); 
         this._nameEditWindow = new Window_NameEdit(new Rectangle(0, labelH, Graphics.boxWidth, editH));
         
         const inputY = labelH + editH;
-        const inputH = Graphics.boxHeight - inputY; 
-        this._nameInputWindow = new Window_NameInput(new Rectangle(0, inputY, Graphics.boxWidth, inputH));
-        
+        this._nameInputWindow = new Window_NameInput(new Rectangle(0, inputY, Graphics.boxWidth, Graphics.boxHeight - inputY));
         this._nameInputWindow.setEditWindow(this._nameEditWindow);
         this._nameInputWindow.setHandler('ok', this.onNameOk.bind(this));
         this._nameInputWindow.setHandler('cancel', this.onNameCancel.bind(this));
         
         this.addWindow(this._nameEditWindow);
         this.addWindow(this._nameInputWindow);
-
         this._nameEditWindow.hide();
         this._nameEditWindow.deactivate();
         this._nameInputWindow.hide();
@@ -385,7 +371,6 @@
         const rightPaneW = Graphics.boxWidth - statusW; 
         const ctaW = 280;
         const ctaX = statusW + Math.floor((rightPaneW - ctaW) / 2);
-        
         const labelH = this.calcWindowHeight(1, false);
         const cmdH = this.calcWindowHeight(2, true);
         const startY = Math.floor((Graphics.boxHeight - (labelH + cmdH)) / 2);
@@ -412,7 +397,6 @@
         this.addChild(this._learnMoreSprite);
     };
 
-    // --- Flow Logic ---
     Scene_BeadleCreate.prototype.start = function() {
         Scene_MenuBase.prototype.start.call(this);
         this.startClassSelect();
@@ -420,7 +404,6 @@
 
     Scene_BeadleCreate.prototype.update = function() {
         Scene_MenuBase.prototype.update.call(this);
-        
         if (this._learnMoreSprite.visible) {
             if (Input.isTriggered('cancel') || Input.isTriggered('ok') || Input.isTriggered('shift') || TouchInput.isTriggered()) {
                 SoundManager.playCancel();
@@ -436,8 +419,7 @@
             const classData = this._classWindow.currentExt();
             if (classData) {
                 SoundManager.playCursor();
-                const bmp = ImageManager.loadPicture("$guide-" + classData.name.toLowerCase());
-                this._learnMoreSprite.bitmap = bmp;
+                this._learnMoreSprite.bitmap = ImageManager.loadPicture("$guide-" + classData.name.toLowerCase());
                 this._learnMoreSprite.show();
                 this._classWindow.deactivate();
             }
@@ -449,7 +431,6 @@
         this._labelWindow.show();
         this._classWindow.show();
         this._classWindow.activate();
-        
         this._styleWindow.hide();
         this._styleWindow.deactivate();
         this._styleSprites.forEach(s => s.hide());
@@ -462,23 +443,19 @@
         this._classWindow.deactivate();
         
         if (this._chosenClassData.id !== 8) {
-            for (let i = 0; i < 4; i++) {
-                const styleString = (i + 1).toString().padStart(2, '0');
-                ImageManager.loadFace("PCs1_" + styleString);
-            }
+            for (let i = 0; i < 4; i++) ImageManager.loadFace("PCs1_" + (i + 1).toString().padStart(2, '0'));
         } else {
-            // Preload Mimic Enemy Faces
             for (let i = 0; i < 4; i++) {
                 const enemyId = CONFIG.MIMIC_STARTING_ENEMIES[i];
                 const enemy = $dataEnemies[enemyId];
                 if (enemy) {
                     let faceSheet = `$enemy_${enemy.name.replace(/\s+/g, '')}_face`;
-                    if (enemy.meta.Face) faceSheet = enemy.meta.Face.split(',')[0].trim();
+                    const faceTag = getMimicMeta(enemy, "Face");
+                    if (faceTag) faceSheet = faceTag.split(',')[0].trim();
                     ImageManager.loadFace(faceSheet);
                 }
             }
         }
-        
         this.startStyleSelect();
     };
 
@@ -499,17 +476,28 @@
         const spacing = Graphics.boxWidth / 4;
         for (let i = 0; i < 4; i++) {
             let charName = "";
+            let charIndex = 0;
+            
             if (this._chosenClassData.id === 8) {
                 const enemyId = CONFIG.MIMIC_STARTING_ENEMIES[i];
                 const enemy = $dataEnemies[enemyId];
-                charName = enemy ? "$enemy_" + enemy.name.replace(/\s+/g, '') + "_01" : "";
+                if (enemy) {
+                    const charTag = getMimicMeta(enemy, "Character");
+                    if (charTag) {
+                        const parts = charTag.split(',');
+                        charName = parts[0].trim();
+                        charIndex = parseInt(parts[1]) || 0;
+                    } else {
+                        charName = `$enemy_${enemy.name.replace(/\s+/g, '')}_01`;
+                    }
+                }
             } else {
                 const styleString = (i + 1).toString().padStart(2, '0');
                 charName = "$" + this._chosenClassData.name.toLowerCase() + "_" + styleString;
             }
             
             const sprite = this._styleSprites[i];
-            sprite.setCharacter(charName);
+            sprite.setCharacter(charName, charIndex);
             sprite.x = (spacing * i) + (spacing / 2);
             sprite.y = this._styleWindow.y + 80;
             sprite.show();
@@ -543,17 +531,32 @@
             
             let faceSheet = `$enemy_${enemy.name.replace(/\s+/g, '')}_face`;
             let faceIndex = 0;
-            if (enemy.meta.Face) {
-                const parts = enemy.meta.Face.split(',');
+            const faceTag = getMimicMeta(enemy, "Face");
+            if (faceTag) {
+                const parts = faceTag.split(',');
                 faceSheet = parts[0].trim();
                 faceIndex = parseInt(parts[1]) || 0;
             }
-            const charName = `$enemy_${enemy.name.replace(/\s+/g, '')}_01`;
             
-            this._dummyActor.setCharacterImage(charName, 0);
+            let charName = `$enemy_${enemy.name.replace(/\s+/g, '')}_01`;
+            let charIndex = 0;
+            const charTag = getMimicMeta(enemy, "Character");
+            if (charTag) {
+                const parts = charTag.split(',');
+                charName = parts[0].trim();
+                charIndex = parseInt(parts[1]) || 0;
+            }
+
+            let battlerName = `$enemy_${enemy.name.replace(/\s+/g, '')}_battle_01`;
+            const battlerTag = getMimicMeta(enemy, "Battler");
+            if (battlerTag) {
+                battlerName = battlerTag.trim();
+            }
+            
+            this._dummyActor.setCharacterImage(charName, charIndex);
             this._dummyActor.setFaceImage(faceSheet, faceIndex);
+            this._dummyActor.setBattlerImage(battlerName);
             
-            // Allow stat preview to work if the Mimic plugin is loaded
             if (typeof this._dummyActor.transformIntoMimic === 'function') {
                 this._dummyActor._classId = 8;
                 this._dummyActor.transformIntoMimic(enemyId);
@@ -562,16 +565,16 @@
         } else {
             const faceSheet = "PCs1_" + this._chosenStyleString;
             const charName = "$" + this._chosenClassData.name.toLowerCase() + "_" + this._chosenStyleString;
+            const battlerName = "$" + this._chosenClassData.name.toLowerCase() + "_battle_" + this._chosenStyleString;
             
             this._dummyActor.setCharacterImage(charName, 0);
             this._dummyActor.setFaceImage(faceSheet, this._chosenClassData.faceIndex);
+            this._dummyActor.setBattlerImage(battlerName);
         }
         
         this._dummyActor.setName(""); 
-        
         this._nameEditWindow.setup(this._dummyActor, 12);
         this._nameEditWindow.refresh();
-        
         this._nameEditWindow.show();
         this._nameInputWindow.show();
         this._nameInputWindow.activate();
@@ -598,12 +601,10 @@
 
     Scene_BeadleCreate.prototype.startConfirm = function() {
         this._labelWindow.hide();
-        
         if (this._chosenClassData.id !== 8) {
             this._dummyActor.changeClass(this._chosenClassData.id, false);
             this._dummyActor.recoverAll();
         }
-        
         this._statusWindow.setActor(this._dummyActor);
         this._statusWindow.refresh();
         this._statusWindow.show();
@@ -653,16 +654,40 @@
         if (this._chosenClassData.id === 8) {
             const styleIndex = parseInt(this._chosenStyleString) - 1;
             const enemyId = CONFIG.MIMIC_STARTING_ENEMIES[styleIndex];
+            const enemy = $dataEnemies[enemyId];
             
-            // Let the Mimic plugin handle the true intercept
             if (typeof realActor.transformIntoMimic === 'function') {
                 realActor.transformIntoMimic(enemyId);
             }
             
-            // Clear base strings so the intercept getters function dynamically
-            realActor.setCharacterImage("", 0);
-            realActor.setBattlerImage("");
-            realActor.setFaceImage("", 0);
+            let faceSheet = `$enemy_${enemy.name.replace(/\s+/g, '')}_face`;
+            let faceIndex = 0;
+            const faceTag = getMimicMeta(enemy, "Face");
+            if (faceTag) {
+                const parts = faceTag.split(',');
+                faceSheet = parts[0].trim();
+                faceIndex = parseInt(parts[1]) || 0;
+            }
+            
+            let charName = `$enemy_${enemy.name.replace(/\s+/g, '')}_01`;
+            let charIndex = 0;
+            const charTag = getMimicMeta(enemy, "Character");
+            if (charTag) {
+                const parts = charTag.split(',');
+                charName = parts[0].trim();
+                charIndex = parseInt(parts[1]) || 0;
+            }
+
+            let battlerName = `$enemy_${enemy.name.replace(/\s+/g, '')}_battle_01`;
+            const battlerTag = getMimicMeta(enemy, "Battler");
+            if (battlerTag) {
+                battlerName = battlerTag.trim();
+            }
+
+            realActor.setCharacterImage(charName, charIndex);
+            realActor.setFaceImage(faceSheet, faceIndex);
+            realActor.setBattlerImage(battlerName);
+
         } else {
             const charName = "$" + this._chosenClassData.name.toLowerCase() + "_" + this._chosenStyleString;
             const battlerName = "$" + this._chosenClassData.name.toLowerCase() + "_battle_" + this._chosenStyleString;
@@ -681,8 +706,6 @@
         }
         
         $gameParty.addActor(this._targetActorId);
-        
-        // Forces an immediate global visual refresh.
         $gamePlayer.refresh();
         $gameMap.requestRefresh();
     };

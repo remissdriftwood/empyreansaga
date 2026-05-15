@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 5: Mimic Class Mechanics v1.1
+ * @plugindesc Phase 5: Mimic Class Mechanics v1.2
  * @author Custom Build
  * * @command StartMimicDialogue
  * @text Start Mimic Dialogue
@@ -32,9 +32,8 @@
     // 0. Configuration
     //=============================================================================
     const CONFIG = {
-        MIMIC_CLASS_ID: 8, // Set to your Mimic's Class ID in the database
-        MIMIC_STARTING_ENEMIES: [2, 3, 4, 5], // IDs for Character Creation options
-        RATING_MULTIPLIER: 0.25 // 25% per '+' or '-'
+        MIMIC_CLASS_ID: 8, 
+        RATING_MULTIPLIER: 0.25 
     };
 
     //=============================================================================
@@ -63,6 +62,43 @@
         this._mimickedEnemyId = enemyId;
         this.clearEquipments();
         this.setMp(this.mmp); // Restore MP on transformation
+        
+        // Natively update graphics to prevent SV rendering cache issues
+        const enemy = $dataEnemies[enemyId];
+        if (enemy) {
+            const getMeta = (tag) => {
+                if (!enemy.meta) return null;
+                const key = Object.keys(enemy.meta).find(k => k.toLowerCase() === tag.toLowerCase());
+                return key ? String(enemy.meta[key]) : null;
+            };
+
+            let faceName = `$enemy_${enemy.name.replace(/\s+/g, '')}_face`;
+            let faceIndex = 0;
+            const faceTag = getMeta("Face");
+            if (faceTag) {
+                faceName = faceTag.split(',')[0].trim();
+                faceIndex = parseInt(faceTag.split(',')[1]) || 0;
+            }
+            
+            let charName = `$enemy_${enemy.name.replace(/\s+/g, '')}_01`;
+            let charIndex = 0;
+            const charTag = getMeta("Character");
+            if (charTag) {
+                charName = charTag.split(',')[0].trim();
+                charIndex = parseInt(charTag.split(',')[1]) || 0;
+            }
+            
+            let battlerName = `$enemy_${enemy.name.replace(/\s+/g, '')}_battle_01`;
+            const battlerTag = getMeta("Battler");
+            if (battlerTag) {
+                battlerName = battlerTag.trim();
+            }
+
+            this.setFaceImage(faceName, faceIndex);
+            this.setCharacterImage(charName, charIndex);
+            this.setBattlerImage(battlerName);
+        }
+        
         this.refresh();
     };
 
@@ -75,11 +111,18 @@
     //=============================================================================
     // Visual Intercepts
     //=============================================================================
+    function getMimicMeta(enemy, tag) {
+        if (!enemy || !enemy.meta) return null;
+        const key = Object.keys(enemy.meta).find(k => k.toLowerCase() === tag.toLowerCase());
+        return key ? String(enemy.meta[key]) : null;
+    }
+
     const _Game_Actor_faceName = Game_Actor.prototype.faceName;
     Game_Actor.prototype.faceName = function() {
         if (this._classId === CONFIG.MIMIC_CLASS_ID && this._mimickedEnemyId) {
             const enemy = $dataEnemies[this._mimickedEnemyId];
-            if (enemy.meta.Face) return enemy.meta.Face.split(',')[0].trim();
+            const metaTag = getMimicMeta(enemy, "Face");
+            if (metaTag) return metaTag.split(',')[0].trim();
             return `$enemy_${enemy.name.replace(/\s+/g, '')}_face`;
         }
         return _Game_Actor_faceName.call(this);
@@ -89,7 +132,8 @@
     Game_Actor.prototype.faceIndex = function() {
         if (this._classId === CONFIG.MIMIC_CLASS_ID && this._mimickedEnemyId) {
             const enemy = $dataEnemies[this._mimickedEnemyId];
-            if (enemy.meta.Face) return parseInt(enemy.meta.Face.split(',')[1]) || 0;
+            const metaTag = getMimicMeta(enemy, "Face");
+            if (metaTag) return parseInt(metaTag.split(',')[1]) || 0;
             return 0;
         }
         return _Game_Actor_faceIndex.call(this);
@@ -99,7 +143,8 @@
     Game_Actor.prototype.characterName = function() {
         if (this._classId === CONFIG.MIMIC_CLASS_ID && this._mimickedEnemyId) {
             const enemy = $dataEnemies[this._mimickedEnemyId];
-            if (enemy.meta.Character) return enemy.meta.Character.split(',')[0].trim();
+            const metaTag = getMimicMeta(enemy, "Character");
+            if (metaTag) return metaTag.split(',')[0].trim();
             return `$enemy_${enemy.name.replace(/\s+/g, '')}_01`;
         }
         return _Game_Actor_characterName.call(this);
@@ -109,7 +154,8 @@
     Game_Actor.prototype.characterIndex = function() {
         if (this._classId === CONFIG.MIMIC_CLASS_ID && this._mimickedEnemyId) {
             const enemy = $dataEnemies[this._mimickedEnemyId];
-            if (enemy.meta.Character) return parseInt(enemy.meta.Character.split(',')[1]) || 0;
+            const metaTag = getMimicMeta(enemy, "Character");
+            if (metaTag) return parseInt(metaTag.split(',')[1]) || 0;
             return 0;
         }
         return _Game_Actor_characterIndex.call(this);
@@ -119,7 +165,8 @@
     Game_Actor.prototype.battlerName = function() {
         if (this._classId === CONFIG.MIMIC_CLASS_ID && this._mimickedEnemyId) {
             const enemy = $dataEnemies[this._mimickedEnemyId];
-            if (enemy.meta.Battler) return enemy.meta.Battler.trim();
+            const metaTag = getMimicMeta(enemy, "Battler");
+            if (metaTag) return metaTag.trim();
             return `$enemy_${enemy.name.replace(/\s+/g, '')}_battle_01`;
         }
         return _Game_Actor_battlerName.call(this);
@@ -130,7 +177,7 @@
     Window_Base.prototype.drawActorClass = function(actor, x, y, width) {
         if (actor._classId === CONFIG.MIMIC_CLASS_ID && actor._mimickedEnemyId) {
             const enemy = $dataEnemies[actor._mimickedEnemyId];
-            const name = enemy.meta.ClassName || enemy.name;
+            const name = getMimicMeta(enemy, "ClassName") || enemy.name;
             this.resetTextColor();
             this.drawText(name, x, y, width);
         } else {
@@ -173,9 +220,9 @@
         
         if (this._classId === CONFIG.MIMIC_CLASS_ID && this._mimickedEnemyId) {
             const enemy = $dataEnemies[this._mimickedEnemyId];
-            if (paramId === 1) base = enemy.params[1]; // Overwrite MP base with Enemy MP
+            if (paramId === 1) base = enemy.params[1]; 
             
-            const ratingString = enemy.meta.StatRatings || "";
+            const ratingString = getMimicMeta(enemy, "StatRatings") || "";
             const multiplier = getRatingMultiplier(paramId, ratingString);
             return Math.max(1, Math.floor(base * multiplier));
         }
@@ -188,8 +235,7 @@
     const _Game_Enemy_die = Game_Enemy.prototype.die;
     Game_Enemy.prototype.die = function() {
         _Game_Enemy_die.call(this);
-        // By hooking here, AOE kills will process sequentially, leaving the last processed ID in temp.
-        if (this.enemyId() && !$dataEnemies[this.enemyId()].meta.NoMimic) {
+        if (this.enemyId() && !getMimicMeta($dataEnemies[this.enemyId()], "NoMimic")) {
             $gameTemp._lastKilledEnemyId = this.enemyId();
         }
     };
@@ -200,19 +246,17 @@
         $gameTemp._lastKilledEnemyId = null;
     };
 
-    // Inject Mimic flow BEFORE the Victory message and rewards
     const _BattleManager_displayVictoryMessage = BattleManager.displayVictoryMessage;
     BattleManager.displayVictoryMessage = function() {
         const mimics = $gameParty.members().filter(a => a._classId === CONFIG.MIMIC_CLASS_ID);
         
         if (mimics.length > 0 && $gameTemp._lastKilledEnemyId) {
             const targetEnemyId = $gameTemp._lastKilledEnemyId;
-            $gameTemp._lastKilledEnemyId = null; // Clear to prevent loops
+            $gameTemp._lastKilledEnemyId = null; 
             
             if (SceneManager._scene instanceof Scene_Battle) {
-                // Suspends the victory flow to run the UI
                 SceneManager._scene.startMimicFlow(targetEnemyId, () => {
-                    _BattleManager_displayVictoryMessage.call(this); // Resume normal victory
+                    _BattleManager_displayVictoryMessage.call(this); 
                 });
                 return;
             }
@@ -296,7 +340,6 @@
     const setupMimicWindows = function(scene) {
         const width = 400;
         
-        // Setup Prompt
         scene._mimicPromptWindow = new Window_MimicPrompt(new Rectangle((Graphics.boxWidth - width)/2, Graphics.boxHeight/2 - 50, width, 120));
         scene._mimicPromptWindow.setHandler('yes', scene.onMimicPromptYes.bind(scene));
         scene._mimicPromptWindow.setHandler('no', scene.onMimicCancel.bind(scene));
@@ -305,7 +348,6 @@
         scene._mimicPromptWindow.deactivate();
         scene.addWindow(scene._mimicPromptWindow);
 
-        // Setup Select
         scene._mimicSelectWindow = new Window_MimicSelect(new Rectangle(0, 0, 352, Graphics.boxHeight));
         scene._mimicSelectWindow.setHandler('ok', scene.onMimicSelectOk.bind(scene));
         scene._mimicSelectWindow.setHandler('cancel', scene.onMimicSelectCancel.bind(scene));
@@ -313,17 +355,14 @@
         scene._mimicSelectWindow.deactivate();
         scene.addWindow(scene._mimicSelectWindow);
 
-        // Setup Status (Using Core Engine 16-bit status clone)
         scene._mimicStatusWindow = new Window_Status(new Rectangle(0, 0, 200, Graphics.boxHeight));
         scene._mimicStatusWindow.hide();
         scene.addWindow(scene._mimicStatusWindow);
 
-        // Setup Skills
         scene._mimicSkillsWindow = new Window_MimicSkills(new Rectangle(200, 0, Graphics.boxWidth - 200, Graphics.boxHeight - 120));
         scene._mimicSkillsWindow.hide();
         scene.addWindow(scene._mimicSkillsWindow);
 
-        // Setup Confirm
         scene._mimicConfirmWindow = new Window_MimicConfirm(new Rectangle(200, Graphics.boxHeight - 120, Graphics.boxWidth - 200, 120));
         scene._mimicConfirmWindow.setHandler('yes', scene.onMimicConfirmYes.bind(scene));
         scene._mimicConfirmWindow.setHandler('no', scene.onMimicConfirmCancel.bind(scene));
@@ -370,7 +409,6 @@
             this._mimicPromptWindow.activate();
         },
         showMimicConfirmation: function() {
-            // Clone actor to safely show stats without fully committing
             const dummy = JsonEx.makeDeepCopy(this._mimicSelectedActor);
             dummy.transformIntoMimic(this._mimicEnemyId);
             
@@ -419,7 +457,6 @@
         }
     };
 
-    // Inject into Scene_Battle
     const _Scene_Battle_createAllWindows = Scene_Battle.prototype.createAllWindows;
     Scene_Battle.prototype.createAllWindows = function() {
         _Scene_Battle_createAllWindows.call(this);
@@ -448,7 +485,5 @@
         });
     };
     Object.assign(Scene_MimicMap.prototype, buildMimicFlowMethods);
-
-    
 
 })();
