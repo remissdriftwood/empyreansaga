@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 6: Beadle Character Creation Flow v1.13
+ * @plugindesc Phase 6: Beadle Character Creation Flow v1.14
  * @author Custom Build
  * * @command startCreation
  * @text Start Beadle Creation
@@ -18,6 +18,7 @@
  * 4. Confirm (Displays Core_Engine's 16-bit Window_Status layout).
  * * Replaces the first available placeholder actor ("??????") in slots 1-4.
  * Auto-scales level to the party's average.
+ * * UPDATE v1.14: Natively supports Mimic class (ID 8) dynamic transformations.
  */
 
 (() => {
@@ -38,13 +39,16 @@
             { id: 4, name: "Farmer", faceIndex: 3 },
             { id: 5, name: "Chemist", faceIndex: 4 },
             { id: 6, name: "Cultivator", faceIndex: 6 }, 
-            { id: 7, name: "Knight", faceIndex: 5 }
+            { id: 7, name: "Knight", faceIndex: 5 },
+            { id: 8, name: "Mimic", faceIndex: 0 } // Face intercepted dynamically
         ],
         
         // Class ID : [{ item ID, amount }]
         STARTING_ITEMS: {
             4: [{ id: 17, amount: 1 }] // Farmer gets Brandywine Seed
-        }
+        },
+
+        MIMIC_STARTING_ENEMIES: [2, 3, 4, 5] // Enemy IDs for Mimic forms
     };
 
     //=============================================================================
@@ -130,7 +134,12 @@
     Window_BeadleClass.prototype.initialize = function(rect) {
         this._randomStyles = {};
         CONFIG.CLASSES.forEach(c => {
-            this._randomStyles[c.id] = Math.floor(Math.random() * 4) + 1;
+            if (c.id === 8) {
+                const enemies = CONFIG.MIMIC_STARTING_ENEMIES;
+                this._randomStyles[c.id] = enemies[Math.floor(Math.random() * enemies.length)];
+            } else {
+                this._randomStyles[c.id] = Math.floor(Math.random() * 4) + 1;
+            }
         });
         Window_Command.prototype.initialize.call(this, rect);
     };
@@ -150,8 +159,17 @@
     Window_BeadleClass.prototype.drawItem = function(index) {
         const rect = this.itemRect(index); 
         const classData = this._list[index].ext;
-        const styleNum = this._randomStyles[classData.id].toString().padStart(2, '0');
-        const charName = "$" + classData.name.toLowerCase() + "_" + styleNum;
+        let charName = "";
+        
+        if (classData.id === 8) {
+            const enemyId = this._randomStyles[classData.id];
+            const enemy = $dataEnemies[enemyId];
+            charName = enemy ? "$enemy_" + enemy.name.replace(/\s+/g, '') + "_01" : "";
+        } else {
+            const styleNum = this._randomStyles[classData.id].toString().padStart(2, '0');
+            charName = "$" + classData.name.toLowerCase() + "_" + styleNum;
+        }
+
         const dbClass = $dataClasses[classData.id];
         
         const bitmap = ImageManager.loadCharacter(charName);
@@ -443,26 +461,52 @@
         this._classWindow.hide();
         this._classWindow.deactivate();
         
-        for (let i = 0; i < 4; i++) {
-            const styleString = (i + 1).toString().padStart(2, '0');
-            ImageManager.loadFace("PCs1_" + styleString);
+        if (this._chosenClassData.id !== 8) {
+            for (let i = 0; i < 4; i++) {
+                const styleString = (i + 1).toString().padStart(2, '0');
+                ImageManager.loadFace("PCs1_" + styleString);
+            }
+        } else {
+            // Preload Mimic Enemy Faces
+            for (let i = 0; i < 4; i++) {
+                const enemyId = CONFIG.MIMIC_STARTING_ENEMIES[i];
+                const enemy = $dataEnemies[enemyId];
+                if (enemy) {
+                    let faceSheet = `$enemy_${enemy.name.replace(/\s+/g, '')}_face`;
+                    if (enemy.meta.Face) faceSheet = enemy.meta.Face.split(',')[0].trim();
+                    ImageManager.loadFace(faceSheet);
+                }
+            }
         }
         
         this.startStyleSelect();
     };
 
     Scene_BeadleCreate.prototype.startStyleSelect = function() {
-        this._labelWindow.setText("Choose a style");
+        this._labelWindow.setText(this._chosenClassData.id === 8 ? "Choose a starting form" : "Choose a style");
         this._styleWindow.show();
         this._styleWindow.activate();
         
-        const defaultStyleIndex = this._classWindow._randomStyles[this._chosenClassData.id] - 1;
+        let defaultStyleIndex = 0;
+        if (this._chosenClassData.id === 8) {
+            defaultStyleIndex = CONFIG.MIMIC_STARTING_ENEMIES.indexOf(this._classWindow._randomStyles[8]);
+            if (defaultStyleIndex < 0) defaultStyleIndex = 0;
+        } else {
+            defaultStyleIndex = this._classWindow._randomStyles[this._chosenClassData.id] - 1;
+        }
         this._styleWindow.select(defaultStyleIndex);
         
         const spacing = Graphics.boxWidth / 4;
         for (let i = 0; i < 4; i++) {
-            const styleString = (i + 1).toString().padStart(2, '0');
-            const charName = "$" + this._chosenClassData.name.toLowerCase() + "_" + styleString;
+            let charName = "";
+            if (this._chosenClassData.id === 8) {
+                const enemyId = CONFIG.MIMIC_STARTING_ENEMIES[i];
+                const enemy = $dataEnemies[enemyId];
+                charName = enemy ? "$enemy_" + enemy.name.replace(/\s+/g, '') + "_01" : "";
+            } else {
+                const styleString = (i + 1).toString().padStart(2, '0');
+                charName = "$" + this._chosenClassData.name.toLowerCase() + "_" + styleString;
+            }
             
             const sprite = this._styleSprites[i];
             sprite.setCharacter(charName);
@@ -492,11 +536,37 @@
         this._labelWindow.setText("Name this beadle");
         this._labelWindow.show();
         
-        const faceSheet = "PCs1_" + this._chosenStyleString;
-        const charName = "$" + this._chosenClassData.name.toLowerCase() + "_" + this._chosenStyleString;
+        if (this._chosenClassData.id === 8) {
+            const styleIndex = parseInt(this._chosenStyleString) - 1;
+            const enemyId = CONFIG.MIMIC_STARTING_ENEMIES[styleIndex];
+            const enemy = $dataEnemies[enemyId];
+            
+            let faceSheet = `$enemy_${enemy.name.replace(/\s+/g, '')}_face`;
+            let faceIndex = 0;
+            if (enemy.meta.Face) {
+                const parts = enemy.meta.Face.split(',');
+                faceSheet = parts[0].trim();
+                faceIndex = parseInt(parts[1]) || 0;
+            }
+            const charName = `$enemy_${enemy.name.replace(/\s+/g, '')}_01`;
+            
+            this._dummyActor.setCharacterImage(charName, 0);
+            this._dummyActor.setFaceImage(faceSheet, faceIndex);
+            
+            // Allow stat preview to work if the Mimic plugin is loaded
+            if (typeof this._dummyActor.transformIntoMimic === 'function') {
+                this._dummyActor._classId = 8;
+                this._dummyActor.transformIntoMimic(enemyId);
+            }
+            
+        } else {
+            const faceSheet = "PCs1_" + this._chosenStyleString;
+            const charName = "$" + this._chosenClassData.name.toLowerCase() + "_" + this._chosenStyleString;
+            
+            this._dummyActor.setCharacterImage(charName, 0);
+            this._dummyActor.setFaceImage(faceSheet, this._chosenClassData.faceIndex);
+        }
         
-        this._dummyActor.setCharacterImage(charName, 0);
-        this._dummyActor.setFaceImage(faceSheet, this._chosenClassData.faceIndex);
         this._dummyActor.setName(""); 
         
         this._nameEditWindow.setup(this._dummyActor, 12);
@@ -528,8 +598,11 @@
 
     Scene_BeadleCreate.prototype.startConfirm = function() {
         this._labelWindow.hide();
-        this._dummyActor.changeClass(this._chosenClassData.id, false);
-        this._dummyActor.recoverAll();
+        
+        if (this._chosenClassData.id !== 8) {
+            this._dummyActor.changeClass(this._chosenClassData.id, false);
+            this._dummyActor.recoverAll();
+        }
         
         this._statusWindow.setActor(this._dummyActor);
         this._statusWindow.refresh();
@@ -577,13 +650,28 @@
         realActor.changeLevel(avgLevel, false);
         realActor.recoverAll();
 
-        const charName = "$" + this._chosenClassData.name.toLowerCase() + "_" + this._chosenStyleString;
-        const battlerName = "$" + this._chosenClassData.name.toLowerCase() + "_battle_" + this._chosenStyleString;
-        const faceSheet = "PCs1_" + this._chosenStyleString;
-        
-        realActor.setCharacterImage(charName, 0);
-        realActor.setBattlerImage(battlerName);
-        realActor.setFaceImage(faceSheet, this._chosenClassData.faceIndex);
+        if (this._chosenClassData.id === 8) {
+            const styleIndex = parseInt(this._chosenStyleString) - 1;
+            const enemyId = CONFIG.MIMIC_STARTING_ENEMIES[styleIndex];
+            
+            // Let the Mimic plugin handle the true intercept
+            if (typeof realActor.transformIntoMimic === 'function') {
+                realActor.transformIntoMimic(enemyId);
+            }
+            
+            // Clear base strings so the intercept getters function dynamically
+            realActor.setCharacterImage("", 0);
+            realActor.setBattlerImage("");
+            realActor.setFaceImage("", 0);
+        } else {
+            const charName = "$" + this._chosenClassData.name.toLowerCase() + "_" + this._chosenStyleString;
+            const battlerName = "$" + this._chosenClassData.name.toLowerCase() + "_battle_" + this._chosenStyleString;
+            const faceSheet = "PCs1_" + this._chosenStyleString;
+            
+            realActor.setCharacterImage(charName, 0);
+            realActor.setBattlerImage(battlerName);
+            realActor.setFaceImage(faceSheet, this._chosenClassData.faceIndex);
+        }
 
         const itemsToGrant = CONFIG.STARTING_ITEMS[this._chosenClassData.id];
         if (itemsToGrant) {
@@ -594,9 +682,7 @@
         
         $gameParty.addActor(this._targetActorId);
         
-        // Forces an immediate global visual refresh. This fixes the MZ bug where 
-        // the 1st placeholder's map/SV sprite wouldn't instantly update because 
-        // they were already technically in the traveling party!
+        // Forces an immediate global visual refresh.
         $gamePlayer.refresh();
         $gameMap.requestRefresh();
     };

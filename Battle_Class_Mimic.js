@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 5: Mimic Class Mechanics v1.0
+ * @plugindesc Phase 5: Mimic Class Mechanics v1.1
  * @author Custom Build
  * * @command StartMimicDialogue
  * @text Start Mimic Dialogue
@@ -15,10 +15,11 @@
  * - Stat Rating Modifiers (+ = +25%, - = -25%). Max HP uses Mimic Base. MP uses Enemy Base.
  * - End of Battle Choice Flow (Validates last killed enemy).
  * - Out-of-Battle Map NPC Flow (Via Plugin Command).
- * - Character Creation Injection (4 Starting Forms instead of Styles).
  * - Equipment Lock (Seals all equipment slots).
  * * Enemy Database Notetags:
- * <Face: filename, index>
+ * <Face: filename, index> (e.g., <Face: MonsterFaces, 3>)
+ * <Character: filename, index> (e.g., <Character: $GoblinChar, 0>)
+ * <Battler: filename> (e.g., <Battler: Goblin_SV>)
  * <ClassName: Custom Name>
  * <StatRatings: mhp:++, mp:-, atk:+++, def:->
  * <No Mimic>
@@ -71,7 +72,9 @@
         return _Game_Actor_equipSlots.call(this);
     };
 
+    //=============================================================================
     // Visual Intercepts
+    //=============================================================================
     const _Game_Actor_faceName = Game_Actor.prototype.faceName;
     Game_Actor.prototype.faceName = function() {
         if (this._classId === CONFIG.MIMIC_CLASS_ID && this._mimickedEnemyId) {
@@ -96,15 +99,27 @@
     Game_Actor.prototype.characterName = function() {
         if (this._classId === CONFIG.MIMIC_CLASS_ID && this._mimickedEnemyId) {
             const enemy = $dataEnemies[this._mimickedEnemyId];
+            if (enemy.meta.Character) return enemy.meta.Character.split(',')[0].trim();
             return `$enemy_${enemy.name.replace(/\s+/g, '')}_01`;
         }
         return _Game_Actor_characterName.call(this);
+    };
+
+    const _Game_Actor_characterIndex = Game_Actor.prototype.characterIndex;
+    Game_Actor.prototype.characterIndex = function() {
+        if (this._classId === CONFIG.MIMIC_CLASS_ID && this._mimickedEnemyId) {
+            const enemy = $dataEnemies[this._mimickedEnemyId];
+            if (enemy.meta.Character) return parseInt(enemy.meta.Character.split(',')[1]) || 0;
+            return 0;
+        }
+        return _Game_Actor_characterIndex.call(this);
     };
 
     const _Game_Actor_battlerName = Game_Actor.prototype.battlerName;
     Game_Actor.prototype.battlerName = function() {
         if (this._classId === CONFIG.MIMIC_CLASS_ID && this._mimickedEnemyId) {
             const enemy = $dataEnemies[this._mimickedEnemyId];
+            if (enemy.meta.Battler) return enemy.meta.Battler.trim();
             return `$enemy_${enemy.name.replace(/\s+/g, '')}_battle_01`;
         }
         return _Game_Actor_battlerName.call(this);
@@ -434,64 +449,6 @@
     };
     Object.assign(Scene_MimicMap.prototype, buildMimicFlowMethods);
 
-    //=============================================================================
-    // 7. Character Creation (Beadle Hook)
-    //=============================================================================
-    if (typeof Scene_BeadleCreate !== 'undefined') {
-        
-        const _Scene_BeadleCreate_startStyleSelect = Scene_BeadleCreate.prototype.startStyleSelect;
-        Scene_BeadleCreate.prototype.startStyleSelect = function() {
-            if (this._chosenClassData.id === CONFIG.MIMIC_CLASS_ID) {
-                this._labelWindow.setText("Choose a starting form");
-                this._styleWindow.show();
-                this._styleWindow.activate();
-                this._styleWindow.select(0);
-                
-                const spacing = Graphics.boxWidth / 4;
-                for (let i = 0; i < 4; i++) {
-                    const enemyId = CONFIG.MIMIC_STARTING_ENEMIES[i];
-                    const enemy = $dataEnemies[enemyId];
-                    const charName = `$enemy_${enemy.name.replace(/\s+/g, '')}_01`;
-                    
-                    const sprite = this._styleSprites[i];
-                    sprite.setCharacter(charName);
-                    sprite.x = (spacing * i) + (spacing / 2);
-                    sprite.y = this._styleWindow.y + 80;
-                    sprite.show();
-                }
-            } else {
-                _Scene_BeadleCreate_startStyleSelect.call(this);
-            }
-        };
-
-        const _Scene_BeadleCreate_startNameInput = Scene_BeadleCreate.prototype.startNameInput;
-        Scene_BeadleCreate.prototype.startNameInput = function() {
-            if (this._chosenClassData.id === CONFIG.MIMIC_CLASS_ID) {
-                const enemyId = CONFIG.MIMIC_STARTING_ENEMIES[this._styleWindow.index()];
-                this._dummyActor._classId = CONFIG.MIMIC_CLASS_ID; 
-                this._dummyActor.transformIntoMimic(enemyId);
-            }
-            _Scene_BeadleCreate_startNameInput.call(this);
-        };
-
-        const _Scene_BeadleCreate_executeCreation = Scene_BeadleCreate.prototype.executeCreation;
-        Scene_BeadleCreate.prototype.executeCreation = function() {
-            _Scene_BeadleCreate_executeCreation.call(this);
-            
-            if (this._chosenClassData.id === CONFIG.MIMIC_CLASS_ID) {
-                const realActor = $gameActors.actor(this._targetActorId);
-                const enemyId = CONFIG.MIMIC_STARTING_ENEMIES[this._styleWindow.index()];
-                
-                realActor.transformIntoMimic(enemyId);
-                
-                // Clear the base strings since we use dynamic intercepts
-                realActor.setCharacterImage("", 0);
-                realActor.setBattlerImage("");
-                realActor.setFaceImage("", 0);
-                
-                $gamePlayer.refresh();
-            }
-        };
-    }
+    
 
 })();
