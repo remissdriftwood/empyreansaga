@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 6 Addon: Dynamic Class Guide UI v2.8
+ * @plugindesc Phase 6 Addon: Dynamic Class Guide UI v3.5 (Linear Flow)
  * @author Custom Build
  */
 
@@ -22,6 +22,13 @@
         const regex = new RegExp(`<${tag}:\\s*([^>]+)>`, "i");
         const match = obj.note.match(regex);
         return match ? match[1].split(',').map(n => parseInt(n.trim())) : [];
+    };
+
+    const getNumberTag = (obj, tag, fallback) => {
+        if (!obj || !obj.note) return fallback;
+        const regex = new RegExp(`<${tag}:\\s*(\\d+)>`, "i");
+        const match = obj.note.match(regex);
+        return match ? parseInt(match[1]) : fallback;
     };
 
     //=============================================================================
@@ -57,9 +64,9 @@
         const lh = this.lineHeight();
         const center = Math.floor(this.innerWidth / 2);
 
-        // 1. Portrait (Scaled 2x with pixel-perfect nearest neighbor rendering)
+        // 1. Portrait
         const faceName = "PCs1_01"; 
-        const faceIndex = this._classData.id === 8 ? 0 : (this._classData.faceIndex || 0);
+        const faceIndex = this._classData.id === 8 ? 7 : (this._classData.faceIndex || 0);
         const bmp = ImageManager.loadFace(faceName);
         if (!bmp.isReady()) {
             bmp.addLoadListener(this.refresh.bind(this));
@@ -81,7 +88,7 @@
         this.contents.blt(bmp, sx, sy, sw, sh, dx, 0, dw, dh);
         ctx.imageSmoothingEnabled = oldSmoothing;
 
-        // 2. Class Name (32px font)
+        // 2. Class Name
         this.contents.fontFace = $gameSystem.numberFontFace();
         this.contents.fontSize = 32;
         this.changeTextColor(ColorManager.normalColor());
@@ -90,9 +97,8 @@
         this.resetFontSettings();
         this.contents.fontSize = 16; 
 
-        // 3. Description (16px, Centered)
+        // 3. Description
         let desc = getMultilineTag($dataClasses[this._classData.id], "GuideDesc");
-        if (this._classData.id === 8) desc = "A bizarre entity that perfectly mimics the shape,\nstats, and skills of fallen foes.\nEquipment slots are permanently sealed.";
         
         let currentY = dh + 40; 
         const descLines = desc.split('\n');
@@ -117,7 +123,7 @@
         params.forEach((param, i) => {
             const x = (i % 2 === 0) ? col1X : col2X;
             const y = statY + Math.floor(i / 2) * lh;
-            const value = this._classData.id === 8 ? 0 : dbClass.params[param.id][1];
+            const value = dbClass.params[param.id][1];
             this.drawFormattedStat(param.name, value, x, y);
         });
 
@@ -125,21 +131,22 @@
         const divY = statY + lh * 4 + 8;
         this.contents.fillRect(16, divY, this.innerWidth - 32, 2, ColorManager.textColor(25));
 
-        // 6. Equipment Block (Left-Aligned to match stats)
+        // 6. Equipment Block
         const equipY = divY + 12;
 
         let equipIcons = getListTag(dbClass, "GuideEquip");
-        if (this._classData.id === 8) equipIcons = [];
 
-        // Filter invalid tags
         equipIcons = equipIcons.filter(id => !isNaN(id) && id > 0);
 
         if (equipIcons.length > 0) {
-            const startX = 16; // Anchored to col1X
-            const iconSpacing = 36; // 32px icon + 4px gap
+            const iconW = ImageManager.iconWidth || 32;
+            const gap = 4;
+            const totalWidth = (equipIcons.length * iconW) + ((equipIcons.length - 1) * gap);
+            
+            const startX = Math.floor((this.innerWidth - totalWidth) / 2);
 
             equipIcons.forEach((iconId, i) => {
-                this.drawIcon(iconId, startX + (i * iconSpacing), equipY);
+                this.drawIcon(iconId, startX + (i * (iconW + gap)), equipY);
             });
         }
     };
@@ -172,7 +179,7 @@
     };
 
     //=============================================================================
-    // Window_GuideRight (MP System Only - Dynamically Centered)
+    // Window_GuideRight (MP System Only)
     //=============================================================================
     function Window_GuideRight() { this.initialize(...arguments); }
     Window_GuideRight.prototype = Object.create(Window_Base.prototype);
@@ -209,7 +216,6 @@
         const dbClass = $dataClasses[this._classData.id];
 
         let mpDesc = getMultilineTag(dbClass, "GuideMP");
-        if (this._classData.id === 8) mpDesc = "Maximum MP is determined entirely by the\noriginal stats of the mimicked monster.";
         const mpLines = mpDesc.split('\n');
 
         const titleHeight = lh;
@@ -220,7 +226,6 @@
         
         const totalHeight = titleHeight + padding1 + iconHeight + padding2 + descHeight;
         
-        // Math.floor forces integer coordinates to prevent HTML5 canvas tearing/smearing
         let currentY = Math.floor((this.innerHeight - totalHeight) / 2);
 
         // 1. Title
@@ -230,8 +235,8 @@
         
         currentY += titleHeight + padding1;
 
-        // 2. Class MP Icon
-        const classIconId = this._classData.id === 8 ? 1 : 16; 
+        // 2. Class MP Icon (Dynamic per class via Notetag)
+        const classIconId = this._classData.id === 8 ? 8 : getNumberTag(dbClass, "GuideIcon", 16); 
         const pw = ImageManager.iconWidth || 32;
         const ph = ImageManager.iconHeight || 32;
         const sx = (classIconId % 16) * pw;
@@ -274,9 +279,33 @@
         this._data = [];
         if (this._classData) {
             const dbClass = $dataClasses[this._classData.id];
-            let skillIds = getListTag(dbClass, "GuideSkills");
-            skillIds = skillIds.filter(id => !isNaN(id) && id > 0);
-            this._data = skillIds.map(id => $dataSkills[id]).filter(s => s);
+            
+            let skillIds = dbClass.learnings ? dbClass.learnings.map(learning => learning.skillId) : [];
+            skillIds = [...new Set(skillIds)].filter(id => !isNaN(id) && id > 0);
+            
+            let skills = skillIds.map(id => $dataSkills[id]).filter(s => s);
+            
+            // Apply exact Custom Sort Order
+            skills.sort((a, b) => {
+                let orderA = 0;
+                let orderB = 0;
+                
+                if (a && a.note) {
+                    const matchA = a.note.match(/<sort_order:\s*(-?\d+)>/i);
+                    if (matchA) orderA = parseInt(matchA[1]);
+                }
+                if (b && b.note) {
+                    const matchB = b.note.match(/<sort_order:\s*(-?\d+)>/i);
+                    if (matchB) orderB = parseInt(matchB[1]);
+                }
+                
+                if (orderA !== orderB) {
+                    return orderA - orderB;
+                }
+                return (a.id || 0) - (b.id || 0); 
+            });
+            
+            this._data = skills;
         }
     };
 
@@ -323,10 +352,10 @@
         
         this.contents.fontFace = $gameSystem.numberFontFace();
         this.changeTextColor(ColorManager.systemColor());
-        this.drawText("ADAPTIVE ARSENAL", 0, 16, this.innerWidth, "center");
+        this.drawText("MIMIC SKILLS", 0, 16, this.innerWidth, "center");
         this.resetFontSettings();
         
-        const block1 = "Skill selection is dynamically inherited from the copied monster.\nYou gain access to their exact combat logic.".split('\n');
+        const block1 = "Transform into a monster to gain their skills,\ntraits, strengths and weaknesses.\nThe Mimic's stats will be influenced as well.".split('\n');
         for (let i = 0; i < block1.length; i++) {
             this.drawText(block1[i].trim(), 0, 16 + this.lineHeight() + (i * this.lineHeight()), this.innerWidth, "center");
         }
@@ -334,10 +363,10 @@
         const y2 = 16 + this.lineHeight() * 4;
         this.contents.fontFace = $gameSystem.numberFontFace();
         this.changeTextColor(ColorManager.systemColor());
-        this.drawText("UNDEAD ASSIMILATION", 0, y2, this.innerWidth, "center");
+        this.drawText("FRIENDLY MIMICRY", 0, y2, this.innerWidth, "center");
         this.resetFontSettings();
 
-        const block2 = "Innate traits and elemental weaknesses are carried over seamlessly.".split('\n');
+        const block2 = "Some characters you meet outside of battle\nare happy to let you transform into them.".split('\n');
         for (let i = 0; i < block2.length; i++) {
             this.drawText(block2[i].trim(), 0, y2 + this.lineHeight() + (i * this.lineHeight()), this.innerWidth, "center");
         }
@@ -446,15 +475,14 @@
         TouchInput.clear();
     };
 
+    // Correctly Aliased Update Loop
     const _Scene_BeadleCreate_update = window.Scene_BeadleCreate.prototype.update;
     window.Scene_BeadleCreate.prototype.update = function() {
         _Scene_BeadleCreate_update.call(this);
         
         if (this._guideState === 1) {
-            if (Input.isTriggered('cancel') || Input.isTriggered('shift')) {
-                SoundManager.playCancel();
-                this.closeGuide();
-            } else if (Input.isTriggered('ok') || Input.isTriggered('down') || Input.isTriggered('right') || Input.isTriggered('up') || Input.isTriggered('left') || TouchInput.isTriggered()) {
+            // Grouping any progression input (Ok, Cancel, Shift, Directions, Touch) to advance to Page 2
+            if (Input.isTriggered('cancel') || Input.isTriggered('shift') || Input.isTriggered('ok') || Input.isTriggered('down') || Input.isTriggered('right') || Input.isTriggered('up') || Input.isTriggered('left') || TouchInput.isTriggered()) {
                 SoundManager.playCursor();
                 this.showGuidePage2();
             }
@@ -462,6 +490,7 @@
         }
 
         if (this._guideState === 2) {
+            // Escaping Page 2 (Ok and Cancel are bound natively in Window_SkillList, returning them here handles Shift and Mimic overrides)
             if (Input.isTriggered('shift') || (this._guideMimicBoxWindow.visible && (Input.isTriggered('cancel') || Input.isTriggered('ok') || TouchInput.isTriggered()))) {
                 SoundManager.playCancel();
                 this.closeGuide();
