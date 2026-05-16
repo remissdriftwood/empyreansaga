@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 6: Beadle Character Creation Flow v1.17
+ * @plugindesc Phase 6: Beadle Character Creation Flow v1.18 (Cleaned)
  * @author Custom Build
  * * @command startCreation
  * @text Start Beadle Creation
@@ -10,16 +10,6 @@
  * @text Can Cancel?
  * @desc If true, the player can back out of the first menu to cancel creation.
  * @default true
- * * @help
- * Implements a custom Scene for Beadle Creation:
- * 1. Choose Class (with randomized style preview, inline description, and Learn More).
- * 2. Choose Style (4 animated field sprites).
- * 3. Enter Name (Native Name Input with Cancel support).
- * 4. Confirm (Displays Core_Engine's 16-bit Window_Status layout).
- * * Replaces the first available placeholder actor ("??????") in slots 1-4.
- * Auto-scales level to the party's average.
- * * UPDATE v1.17: Natively sets SV battler strings to fix "None" caching.
- * Case-insensitive parsing applied to enemy visual notetags.
  */
 
 (() => {
@@ -206,13 +196,10 @@
         
         this.drawCharacter(charName, charIndex, charX, charY);
 
-        // --- NEW FONT LOGIC ---
-        // Change to the custom Number Font for the Class Name
         this.contents.fontFace = $gameSystem.numberFontFace();
         this.changeTextColor(ColorManager.normalColor());
         this.drawText(classData.name.trim(), textX, textStartY, rect.width - textX);
         
-        // Reset back to standard font for the description text
         this.resetFontSettings();
         
         const description = dbClass.meta.MP_Help ? String(dbClass.meta.MP_Help).trim() : "";
@@ -295,6 +282,7 @@
     function Scene_BeadleCreate() { this.initialize(...arguments); }
     Scene_BeadleCreate.prototype = Object.create(Scene_MenuBase.prototype);
     Scene_BeadleCreate.prototype.constructor = Scene_BeadleCreate;
+    window.Scene_BeadleCreate = Scene_BeadleCreate; // <--- Exposes it to the Addon
 
     Scene_BeadleCreate.prototype.prepare = function(actorId, canCancel) {
         this._targetActorId = actorId;
@@ -314,7 +302,6 @@
         this.createStyleWindow();
         this.createNameWindows();
         this.createConfirmWindows();
-        this.createLearnMoreSprite();
     };
 
     Scene_BeadleCreate.prototype.createLabelWindow = function() {
@@ -396,41 +383,9 @@
         this.addWindow(this._confirmCommand);
     };
 
-    Scene_BeadleCreate.prototype.createLearnMoreSprite = function() {
-        this._learnMoreSprite = new Sprite();
-        this._learnMoreSprite.x = 0;
-        this._learnMoreSprite.y = 0;
-        this._learnMoreSprite.hide();
-        this.addChild(this._learnMoreSprite);
-    };
-
     Scene_BeadleCreate.prototype.start = function() {
         Scene_MenuBase.prototype.start.call(this);
         this.startClassSelect();
-    };
-
-    Scene_BeadleCreate.prototype.update = function() {
-        Scene_MenuBase.prototype.update.call(this);
-        if (this._learnMoreSprite.visible) {
-            if (Input.isTriggered('cancel') || Input.isTriggered('ok') || Input.isTriggered('shift') || TouchInput.isTriggered()) {
-                SoundManager.playCancel();
-                this._learnMoreSprite.hide();
-                Input.clear(); 
-                TouchInput.clear();
-                this._classWindow.activate(); 
-            }
-            return;
-        }
-
-        if (this._classWindow.active && Input.isTriggered('shift')) {
-            const classData = this._classWindow.currentExt();
-            if (classData) {
-                SoundManager.playCursor();
-                this._learnMoreSprite.bitmap = ImageManager.loadPicture("$guide-" + classData.name.toLowerCase());
-                this._learnMoreSprite.show();
-                this._classWindow.deactivate();
-            }
-        }
     };
 
     Scene_BeadleCreate.prototype.startClassSelect = function() {
