@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 6 Addon: Dynamic Class Guide UI v3.5 (Linear Flow)
+ * @plugindesc Phase 6 Addon: Dynamic Class Guide UI v3.6 (Mimic Page Fix)
  * @author Custom Build
  */
 
@@ -235,7 +235,7 @@
         
         currentY += titleHeight + padding1;
 
-        // 2. Class MP Icon (Dynamic per class via Notetag)
+        // 2. Class MP Icon
         const classIconId = this._classData.id === 8 ? 8 : getNumberTag(dbClass, "GuideIcon", 16); 
         const pw = ImageManager.iconWidth || 32;
         const ph = ImageManager.iconHeight || 32;
@@ -285,7 +285,6 @@
             
             let skills = skillIds.map(id => $dataSkills[id]).filter(s => s);
             
-            // Apply exact Custom Sort Order
             skills.sort((a, b) => {
                 let orderA = 0;
                 let orderB = 0;
@@ -350,25 +349,47 @@
     Window_GuideMimicBox.prototype.refresh = function() {
         this.contents.clear();
         
+        const lh = this.lineHeight();
+        const block1 = "Transform into a monster to gain their skills,\ntraits, strengths and weaknesses.\nThe Mimic's stats will be influenced as well.".split('\n');
+        const block2 = "Some characters you meet outside of battle\nare happy to let you transform into them.".split('\n');
+
+        const titleHeight = lh;
+        const block1Height = block1.length * lh;
+        const blockPadding = lh * 1.5; // Custom visual gap to push the second block down
+        const block2Height = block2.length * lh;
+
+        const totalHeight = titleHeight + block1Height + blockPadding + titleHeight + block2Height;
+        
+        // Dynamically find exact vertical center
+        let currentY = Math.floor((this.innerHeight - totalHeight) / 2);
+
+        // Block 1: Title
         this.contents.fontFace = $gameSystem.numberFontFace();
         this.changeTextColor(ColorManager.systemColor());
-        this.drawText("MIMIC SKILLS", 0, 16, this.innerWidth, "center");
+        this.drawText("MIMIC SKILLS", 0, currentY, this.innerWidth, "center");
         this.resetFontSettings();
+        currentY += titleHeight;
         
-        const block1 = "Transform into a monster to gain their skills,\ntraits, strengths and weaknesses.\nThe Mimic's stats will be influenced as well.".split('\n');
+        // Block 1: Content
         for (let i = 0; i < block1.length; i++) {
-            this.drawText(block1[i].trim(), 0, 16 + this.lineHeight() + (i * this.lineHeight()), this.innerWidth, "center");
+            this.drawText(block1[i].trim(), 0, currentY, this.innerWidth, "center");
+            currentY += lh;
         }
 
-        const y2 = 16 + this.lineHeight() * 4;
+        // Apply visual padding
+        currentY += blockPadding;
+
+        // Block 2: Title
         this.contents.fontFace = $gameSystem.numberFontFace();
         this.changeTextColor(ColorManager.systemColor());
-        this.drawText("FRIENDLY MIMICRY", 0, y2, this.innerWidth, "center");
+        this.drawText("FRIENDLY MIMICRY", 0, currentY, this.innerWidth, "center");
         this.resetFontSettings();
+        currentY += titleHeight;
 
-        const block2 = "Some characters you meet outside of battle\nare happy to let you transform into them.".split('\n');
+        // Block 2: Content
         for (let i = 0; i < block2.length; i++) {
-            this.drawText(block2[i].trim(), 0, y2 + this.lineHeight() + (i * this.lineHeight()), this.innerWidth, "center");
+            this.drawText(block2[i].trim(), 0, currentY, this.innerWidth, "center");
+            currentY += lh;
         }
     };
 
@@ -410,7 +431,9 @@
         this._guideSkillListWindow.deactivate();
         this.addWindow(this._guideSkillListWindow);
 
-        this._guideMimicBoxWindow = new Window_GuideMimicBox(listRect);
+        // Provide the Mimic Box the full window height to overlap the hidden help window area
+        const fullRect = new Rectangle(0, startY, Graphics.boxWidth, winHeight);
+        this._guideMimicBoxWindow = new Window_GuideMimicBox(fullRect);
         this._guideMimicBoxWindow.hide();
         this.addWindow(this._guideMimicBoxWindow);
     };
@@ -475,13 +498,11 @@
         TouchInput.clear();
     };
 
-    // Correctly Aliased Update Loop
     const _Scene_BeadleCreate_update = window.Scene_BeadleCreate.prototype.update;
     window.Scene_BeadleCreate.prototype.update = function() {
         _Scene_BeadleCreate_update.call(this);
         
         if (this._guideState === 1) {
-            // Grouping any progression input (Ok, Cancel, Shift, Directions, Touch) to advance to Page 2
             if (Input.isTriggered('cancel') || Input.isTriggered('shift') || Input.isTriggered('ok') || Input.isTriggered('down') || Input.isTriggered('right') || Input.isTriggered('up') || Input.isTriggered('left') || TouchInput.isTriggered()) {
                 SoundManager.playCursor();
                 this.showGuidePage2();
@@ -490,7 +511,6 @@
         }
 
         if (this._guideState === 2) {
-            // Escaping Page 2 (Ok and Cancel are bound natively in Window_SkillList, returning them here handles Shift and Mimic overrides)
             if (Input.isTriggered('shift') || (this._guideMimicBoxWindow.visible && (Input.isTriggered('cancel') || Input.isTriggered('ok') || TouchInput.isTriggered()))) {
                 SoundManager.playCancel();
                 this.closeGuide();
