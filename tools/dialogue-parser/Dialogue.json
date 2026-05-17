@@ -1,0 +1,22 @@
+{
+  "NEW_PLAYER_INTRO": [
+    {
+      "nodeId": "DLG_NEW_PLAYER_INTRO_01",
+      "speaker": "",
+      "text": "All beadles are welcome here.\nSpeaking of, have you had a\nchance to meet any fellow\nbeadles yet?",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_NEW_PLAYER_INTRO_02",
+      "speaker": "",
+      "text": "There are always brave folk\nwilling to lay down their lives\nto help those less fortunate.",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_NEW_PLAYER_INTRO_03",
+      "speaker": "",
+      "text": "My brother in the chancel\nshould be able to introduce you\nto many such beadles. Pray speak\nwith him before you leave.",
+      "actions": []
+    }
+  ]
+}

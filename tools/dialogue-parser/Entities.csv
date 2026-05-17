@@ -1,0 +1,6 @@
+﻿Name,Description,DisplayName,Entity ID,Impact,Relations,Relevance,Scenario,Trigger,Type
+Cardinal Cassata,,Cardinal Cassata,CHR_CARDINAL,,,,,,Character
+Church of Mangiafagioli,,Church of Mangiafagioli,ORG_CHURCH,,,,,,Organization
+Infernal Machine,,Infernal Machine,CHR_INFERNALMACH,,,,,,Character
+Intro town,"The rural, pastoral town in which the PCs begin",Intro town,LOC_INTRO,Direct,New player intro NPC (https://www.notion.so/New-player-intro-NPC-3634a208bd2c8050a701d80992274526?pvs=21),Main story,"Pastoral patrol pandemonium (https://www.notion.so/Pastoral-patrol-pandemonium-3624a208bd2c801f8612fd78d16ea5ac?pvs=21), Late caravan (https://www.notion.so/Late-caravan-3624a208bd2c8018bfbfe935533c8d23?pvs=21), Night raid (https://www.notion.so/Night-raid-3624a208bd2c8071a266f9d627597907?pvs=21)",,Location
+New player intro NPC,Meant to increase the chances the player understands they can add additional characters to their party,,CHR_NEW_PLAYER_INTRO,Indirect,Intro town (https://www.notion.so/Intro-town-3624a208bd2c809dae46e5532b63691b?pvs=21),Just flavor,,,Character

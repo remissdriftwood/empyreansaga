@@ -1,0 +1,12 @@
+﻿DialogueNodeID,Choice_1_Target,Choice_1_Text,Choice_2_Target,Choice_2_Text,Choice_3_Target,Choice_3_Text,Condition_Switch,ConversationID,Dialogue,Is_Choice,Next_Node,Notes/Context,Speaker
+DLG_NEW_PLAYER_INTRO_01,,,,,,,,NEW_PLAYER_INTRO,"All beadles are welcome here.
+Speaking of, have you had a
+chance to meet any fellow
+beadles yet?",No,,,New player intro NPC (https://www.notion.so/New-player-intro-NPC-3634a208bd2c8050a701d80992274526?pvs=21)
+DLG_NEW_PLAYER_INTRO_02,,,,,,,,NEW_PLAYER_INTRO,"There are always brave folk
+willing to lay down their lives
+to help those less fortunate.",No,,,New player intro NPC (https://www.notion.so/New-player-intro-NPC-3634a208bd2c8050a701d80992274526?pvs=21)
+DLG_NEW_PLAYER_INTRO_03,,,,,,,,NEW_PLAYER_INTRO,"My brother in the chancel
+should be able to introduce you
+to many such beadles. Pray speak
+with him before you leave.",No,,,New player intro NPC (https://www.notion.so/New-player-intro-NPC-3634a208bd2c8050a701d80992274526?pvs=21)
