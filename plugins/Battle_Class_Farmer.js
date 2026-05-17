@@ -163,26 +163,4 @@
         _BattleManager_endTurn.call(this);
     };
 
-    //=============================================================================
-    // 5. Map Event Visibility Hiding
-    //=============================================================================
-    const _Game_Event_meetsConditions = Game_Event.prototype.meetsConditions;
-    Game_Event.prototype.meetsConditions = function(page) {
-        const meets = _Game_Event_meetsConditions.call(this, page);
-        if (!meets) return false;
-        
-        if (this.event() && this.event().name) {
-            const match = this.event().name.match(/seed\s+(\d+)/i);
-            if (match) {
-                const itemId = parseInt(match[1]);
-                const hasFarmer = $gameParty.members().some(actor => actor._classId === CONFIG.FARMER_CLASS_ID);
-                
-                if (!hasFarmer) return false;
-                if ($gameParty.hasItem($dataItems[itemId])) return false;
-            }
-        }
-        
-        return true;
-    };
-
 })();

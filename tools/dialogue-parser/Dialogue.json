@@ -3,19 +3,213 @@
     {
       "nodeId": "DLG_NEW_PLAYER_INTRO_01",
       "speaker": "",
-      "text": "All beadles are welcome here.\nSpeaking of, have you had a\nchance to meet any fellow\nbeadles yet?",
+      "text": "All beadles are welcome here. Speaking of,\nhave you had a chance to meet any fellow beadles yet?",
       "actions": []
     },
     {
       "nodeId": "DLG_NEW_PLAYER_INTRO_02",
       "speaker": "",
-      "text": "There are always brave folk\nwilling to lay down their lives\nto help those less fortunate.",
+      "text": "There are always brave folk willing to lay down\ntheir lives to help those less fortunate.",
       "actions": []
     },
     {
       "nodeId": "DLG_NEW_PLAYER_INTRO_03",
       "speaker": "",
-      "text": "My brother in the chancel\nshould be able to introduce you\nto many such beadles. Pray speak\nwith him before you leave.",
+      "text": "My brother in the chancel above should\nbe able to introduce you to many\nsuch beadles. Pray speak with him\nbefore you leave.",
+      "actions": []
+    }
+  ],
+  "INTRO_QUEST_CLERIC_PATROL": [
+    {
+      "nodeId": "DLG_INTRO_QUEST_CLERIC_01",
+      "speaker": "",
+      "text": "Blessings and all that. Been out to visit\nthe pastures yet?",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_INTRO_QUEST_CLERIC_02",
+      "speaker": "",
+      "text": "Daily patrols may not be glamorous,\nbut at least they’re… Oh, Who am I\nfooling? They suck.",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_INTRO_QUEST_CLERIC_03",
+      "speaker": "",
+      "text": "Good thing they’re your job, not mine!",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_INTRO_QUEST_CLERIC_04",
+      "speaker": "",
+      "text": "…I guess I shouldn’t say that, as a\ncleric and all. \nHave fun!",
+      "actions": []
+    }
+  ],
+  "INTRO_QUEST_CLERIC_CARAVAN": [
+    {
+      "nodeId": "DLG_INTRO_QUEST_CLERIC_05",
+      "speaker": "",
+      "text": "Done with patrols? Good on you.",
+      "actions": [],
+      "conditionSwitch": "001_MAIN_PASTURE_PATROL"
+    }
+  ],
+  "NEW_PLAYER_INTRO_SMALLTALK": [
+    {
+      "nodeId": "DLG_NEW_PLAYER_INTRO_04",
+      "speaker": "",
+      "text": "Bless you for your work patrolling\nthe pastures. It may not be exciting\nbut it’s important. The people\nrely on you.",
+      "actions": [],
+      "conditionSwitch": "001_MAIN_PASTURE_PATROL"
+    }
+  ],
+  "HOMESICK_SLIME": [
+    {
+      "nodeId": "DLG_HOMESICK_SLIME_01",
+      "speaker": "",
+      "text": "I should write home to my mama.\nLet her know how I'm doing.",
+      "actions": []
+    }
+  ],
+  "INTRO_DROOPY_DOG": [
+    {
+      "nodeId": "DLG_INTRO_DROOPY_DOG_01",
+      "speaker": "",
+      "text": "…Woof.\n…Boof.\n……Borf.",
+      "actions": []
+    }
+  ],
+  "INTRO_NEARBY_ENEMIES": [
+    {
+      "nodeId": "DLG_INTRO_NEARBY_ENEMIES_01",
+      "speaker": "",
+      "text": "Boy, I’m glad you beadles are here to help take\ncare of all those creeps roaming around outside\nof town!",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_INTRO_NEARBY_ENEMIES_02",
+      "speaker": "",
+      "text": "Nearby it’s mostly slimes.\nIndividually, they’re not much to write home about.",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_INTRO_NEARBY_ENEMIES_03",
+      "speaker": "",
+      "text": "But let them gang up on you and your mama\nbetter break out her cheaters.",
+      "actions": []
+    }
+  ],
+  "BUY_EQUIPMENT_REMINDER": [
+    {
+      "nodeId": "DLG_BUY_EQUIPMENT_REMINDER_01",
+      "speaker": "",
+      "text": "If you’re heading outside, make sure you stop by the\nstores here in town and stock up.",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_BUY_EQUIPMENT_REMINDER_02",
+      "speaker": "",
+      "text": "Fighting is a lot tougher when all you’ve got\nis your slappers.",
+      "actions": []
+    }
+  ],
+  "FARMER_INTRO": [
+    {
+      "nodeId": "DLG_FARMER_INTRO_01",
+      "speaker": "",
+      "text": "Make sure to pick up any seeds you find lying around\non the ground. You’ll never use them up,\nso more seeds just means more types of crops.",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_FARMER_INTRO_02",
+      "speaker": "",
+      "text": "Once your crops mature, they’ll stick around until\nyou harvest them, so long as you don’t plant\nmore than three of them.",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_FARMER_INTRO_03",
+      "speaker": "",
+      "text": "They’ll even stay good between battles, so don’t fuss\nthat you need to use them as soon as they’re ready.",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_FARMER_INTRO_04",
+      "speaker": "",
+      "text": "Farming’s all about planning and patience. Don’t think about\nwhat you need right this moment; think about what\nyou’ll need, oh, say…",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_FARMER_INTRO_05",
+      "speaker": "",
+      "text": "Three turns from now.",
+      "actions": []
+    }
+  ],
+  "CULTIVATOR_INTRO": [
+    {
+      "nodeId": "DLG_CULTIVATOR_INTRO_01",
+      "speaker": "",
+      "text": "If you can perceive of me, then you must be\na fellow cultivator",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_CULTIVATOR_INTRO_02",
+      "speaker": "",
+      "text": "See this resplendent peach? It’s quite an auspicious thing.\nTry consuming the next one you see in the wild.",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_CULTIVATOR_INTRO_03",
+      "speaker": "",
+      "text": "The powers of the natural world shall course through\nyour body and fill your internal vessels with stores of\nelemental energy.",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_CULTIVATOR_INTRO_04",
+      "speaker": "",
+      "text": "With each attack, your body and weapon will channel\nthat elemental energy to produce profound effects.",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_CULTIVATOR_INTRO_05",
+      "speaker": "",
+      "text": "Water heals you and your allies for a small amount.",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_CULTIVATOR_INTRO_06",
+      "speaker": "",
+      "text": "Wood restores your own health considerably.",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_CULTIVATOR_INTRO_07",
+      "speaker": "",
+      "text": "Fire increases your chance to hit enemy weak points.",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_CULTIVATOR_INTRO_08",
+      "speaker": "",
+      "text": "Earth deals extra damage to the enemy.\nThe healthier they are, the more damage is inflicted.",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_CULTIVATOR_INTRO_09",
+      "speaker": "",
+      "text": "Metal deals a small amount of damage to all enemies.",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_CULTIVATOR_INTRO_10",
+      "speaker": "",
+      "text": "Ahh…! Truly, this peach is a wondrous thing.\nHeed my advice and eat them without hesitation.",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_CULTIVATOR_INTRO_11",
+      "speaker": "",
+      "text": "Not this one, though. It’s mine.\nYou can’t have it.",
       "actions": []
     }
   ]
