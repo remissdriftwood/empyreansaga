@@ -44,7 +44,11 @@
     // 1. Plugin Command Registration
     //=============================================================================
     PluginManager.registerCommand("Character_Creation", "startCreation", args => {
-        const canCancel = args.canCancel === "true";
+        // Default to true. Only disable if explicitly flagged as false.
+        let canCancel = true;
+        if (args.canCancel === "false" || args.canCancel === false) {
+            canCancel = false;
+        }
         
         let targetActorId = null;
         for (const id of CONFIG.PARTY_SLOTS) {
@@ -245,11 +249,29 @@
     Window_BeadleConfirm.prototype.makeCommandList = function() { this.addCommand("Yes", 'yes'); this.addCommand("No", 'no'); };
     Window_BeadleConfirm.prototype.itemTextAlign = function() { return 'center'; };
 
-    if (Window_NameInput.LATIN1) Window_NameInput.LATIN1[88] = " ";
-    if (Window_NameInput.LATIN2) Window_NameInput.LATIN2[88] = " ";
-    Window_NameInput.prototype.processJump = function() {};
-    Window_NameInput.prototype.processPagedown = function() {};
-    Window_NameInput.prototype.processPageup = function() {};
+    // OVERRIDE: Intercept the native backspace function. 
+    // If empty, exit to previous screen. If not, delete character.
+    Window_NameInput.prototype.processBack = function() {
+        if (this._editWindow.name().length === 0) {
+            SoundManager.playCancel();
+            this.callHandler('cancel');
+        } else {
+            if (this._editWindow.back()) {
+                SoundManager.playCancel();
+            }
+        }
+    };
+
+    // Override: Allow canceling out of the Name Input if the name is already empty
+    const _Window_NameInput_processCancel = Window_NameInput.prototype.processCancel;
+    Window_NameInput.prototype.processCancel = function() {
+        if (this._editWindow.name().length === 0) {
+            SoundManager.playCancel();
+            this.callHandler('cancel');
+        } else {
+            _Window_NameInput_processCancel.call(this);
+        }
+    };
 
     Window_NameEdit.prototype.left = function() {
         const totalWidth = this._maxLength * this.charWidth();
