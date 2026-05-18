@@ -3,6 +3,12 @@
  * @plugindesc Notion JSON to MZ Dialogue Bridge
  * @author Empyrean Saga
  *
+ * @param ResultVariableID
+ * @text Result Variable ID
+ * @desc The Game Variable used to store EXIT codes from Notion choices.
+ * @type variable
+ * @default 1
+ *
  * @help Dialogue_Manager.js
  * * This plugin loads data/Dialogue.json (generated via Node.js)
  * and executes complex branching dialogue via a single Plugin Command.
@@ -15,12 +21,64 @@
  * @text Conversation ID
  * @desc The grouping ID from Notion (e.g., NEW_PLAYER_INTRO)
  * @type string
+ *
+ * @command PlayItemMessage
+ * @text Play Item Message
+ * @desc Plays a system message and dynamically injects item data.
+ *
+ * @arg ConversationID
+ * @text Conversation ID
+ * @desc The grouping ID from Notion (e.g., SYS_ITEM_GET)
+ * @type string
+ *
+ * @arg ItemType
+ * @text Item Type
+ * @desc Is it an Item, Weapon, or Armor?
+ * @type select
+ * @option Item
+ * @value item
+ * @option Weapon
+ * @value weapon
+ * @option Armor
+ * @value armor
+ * @default item
+ *
+ * @arg ItemID
+ * @text Item ID
+ * @desc The database ID of the item.
+ * @type number
+ * @default 1
+ *
+ * @arg Amount
+ * @text Amount
+ * @desc The amount of the item obtained.
+ * @type number
+ * @default 1
+ *
+ * @command PlayCurrencyMessage
+ * @text Play Currency Message
+ * @desc Plays a system message and dynamically injects a money amount.
+ *
+ * @arg ConversationID
+ * @text Conversation ID
+ * @desc The grouping ID from Notion (e.g., SYS_MONEY_GET)
+ * @type string
+ *
+ * @arg Amount
+ * @text Amount
+ * @desc The amount of currency obtained.
+ * @type number
+ * @default 100
  */
 
 var $dataDialogue = null;
 
 (() => {
     const pluginName = "Dialogue_Manager";
+    
+    // Grab the configured Variable ID from the Plugin Manager
+    const parameters = PluginManager.parameters(pluginName);
+    const resultVarId = Number(parameters['ResultVariableID'] || 1);
 
     // =========================================================================
     // 1. Database Loading
@@ -34,6 +92,7 @@ var $dataDialogue = null;
     // =========================================================================
     // 2. Plugin Command Registration
     // =========================================================================
+    
     PluginManager.registerCommand(pluginName, "PlayConversation", function(args) {
         const convoId = args.ConversationID;
         if (!$dataDialogue || !$dataDialogue[convoId]) {
@@ -43,20 +102,47 @@ var $dataDialogue = null;
         this.setupDialogueConversation(convoId);
     });
 
+    PluginManager.registerCommand(pluginName, "PlayItemMessage", function(args) {
+        const convoId = args.ConversationID;
+        if (!$dataDialogue || !$dataDialogue[convoId]) {
+            console.warn(`[Dialogue Manager] Conversation ID not found: ${convoId}`);
+            return;
+        }
+        
+        this._dmInjectedItemType = args.ItemType;
+        this._dmInjectedItemID = parseInt(args.ItemID, 10);
+        this._dmInjectedAmount = parseInt(args.Amount, 10);
+        
+        this.setupDialogueConversation(convoId);
+    });
+
+    PluginManager.registerCommand(pluginName, "PlayCurrencyMessage", function(args) {
+        const convoId = args.ConversationID;
+        if (!$dataDialogue || !$dataDialogue[convoId]) {
+            console.warn(`[Dialogue Manager] Conversation ID not found: ${convoId}`);
+            return;
+        }
+        
+        this._dmInjectedAmount = parseInt(args.Amount, 10);
+        this.setupDialogueConversation(convoId);
+    });
+
     // =========================================================================
     // 3. Interpreter Injection (The Engine Logic)
     // =========================================================================
     
-    // Clear custom state when the interpreter resets
     const alias_Game_Interpreter_clear = Game_Interpreter.prototype.clear;
     Game_Interpreter.prototype.clear = function() {
         alias_Game_Interpreter_clear.call(this);
         this._dmConvoId = null;
         this._dmNodeIndex = 0;
         this._dmPendingRoute = null;
+        
+        this._dmInjectedItemType = null;
+        this._dmInjectedItemID = 0;
+        this._dmInjectedAmount = -1;
     };
 
-    // Initialize the state machine
     Game_Interpreter.prototype.setupDialogueConversation = function(convoId, startIndex = 0) {
         this._dmConvoId = convoId;
         this._dmNodeIndex = startIndex;
@@ -64,11 +150,9 @@ var $dataDialogue = null;
         this.processNextDialogueNode();
     };
 
-    // Process a single JSON node
     Game_Interpreter.prototype.processNextDialogueNode = function() {
         const convo = $dataDialogue[this._dmConvoId];
         
-        // Terminate if we reached the end of the array
         if (!convo || this._dmNodeIndex >= convo.length) {
             this.setWaitMode('');
             return; 
@@ -76,14 +160,11 @@ var $dataDialogue = null;
 
         const node = convo[this._dmNodeIndex];
 
-        // --- CONDITION SWITCH EVALUATION ---
         if (node.conditionSwitch) {
-            // Uses Regex to pull the leading number from strings like "005_MET"
             const match = node.conditionSwitch.match(/^0*(\d+)/); 
             if (match) {
                 const switchId = parseInt(match[1], 10);
                 if (!$gameSwitches.value(switchId)) {
-                    // Switch is OFF, skip this node and proceed to next
                     this._dmNodeIndex++;
                     this.processNextDialogueNode();
                     return;
@@ -93,52 +174,75 @@ var $dataDialogue = null;
 
         $gameMessage.newPage();
 
-        // --- SPEAKER NAME ---
         if (node.speaker && node.speaker.trim() !== "") {
             $gameMessage.setSpeakerName(node.speaker);
         } else {
-            $gameMessage.setSpeakerName(""); // Suppresses namebox
+            $gameMessage.setSpeakerName(""); 
         }
 
-        // --- TEXT ---
-        const lines = node.text.split('\n');
+        // --- INJECTION LOGIC ---
+        let processedText = node.text;
+        
+        if (this._dmInjectedItemID > 0) {
+            let itemObj = null;
+            if (this._dmInjectedItemType === 'item') itemObj = $dataItems[this._dmInjectedItemID];
+            if (this._dmInjectedItemType === 'weapon') itemObj = $dataWeapons[this._dmInjectedItemID];
+            if (this._dmInjectedItemType === 'armor') itemObj = $dataArmors[this._dmInjectedItemID];
+
+            if (itemObj) {
+                const replacement = `\\EI[${itemObj.iconIndex}] ${itemObj.name}`;
+                processedText = processedText.replace(/\{ITEM\}/g, replacement);
+            }
+        }
+        
+        if (this._dmInjectedAmount > -1) {
+            processedText = processedText.replace(/\{AMOUNT\}/g, this._dmInjectedAmount.toString());
+        }
+
+        const lines = processedText.split('\n');
         for (const line of lines) {
             $gameMessage.add(line);
         }
 
-        // --- ACTIONS (e.g., [Wait:60]) ---
         if (node.actions && node.actions.length > 0) {
             for (const action of node.actions) {
                 if (action.type.toLowerCase() === 'wait') {
                     const frames = parseInt(action.params[0], 10);
-                    this.wait(frames); // Injects MZ wait command
+                    this.wait(frames); 
                 }
-                // (Space to add [Move] or [Transfer] mapping later)
             }
         }
 
-        // --- CHOICES & ROUTING ---
         if (node.isChoice && node.choices && node.choices.length > 0) {
             const choiceLabels = node.choices.map(c => c.label);
             $gameMessage.setChoices(choiceLabels, 0, -1);
             
-            // When a player clicks a choice, store the target node destination
             $gameMessage.setChoiceCallback((selectionIndex) => {
                 const selectedChoice = node.choices[selectionIndex];
                 this._dmPendingRoute = selectedChoice.targetNode;
             });
         } else if (node.nextNode) {
-            // Explicit override jump
             this._dmPendingRoute = node.nextNode;
         } else {
-            // Default sequential progression
             this._dmPendingRoute = null;
             this._dmNodeIndex++;
         }
     };
 
-    // Locate the target node ID and jump to it
     Game_Interpreter.prototype.routeDialogueNode = function(targetNodeId) {
+        // --- NEW EXIT CODE LOGIC ---
+        if (targetNodeId.toUpperCase().startsWith('EXIT')) {
+            const parts = targetNodeId.split(':');
+            if (parts.length > 1) {
+                const exitCode = parseInt(parts[1], 10);
+                $gameVariables.setValue(resultVarId, exitCode);
+            } else {
+                $gameVariables.setValue(resultVarId, 0); // Default to 0 if just "EXIT"
+            }
+            this.setWaitMode('');
+            return;
+        }
+
         const convo = $dataDialogue[this._dmConvoId];
         const targetIndex = convo.findIndex(n => n.nodeId === targetNodeId);
         
@@ -146,17 +250,15 @@ var $dataDialogue = null;
             this.setupDialogueConversation(this._dmConvoId, targetIndex);
         } else {
             console.error(`[Dialogue Manager] Target Node ID not found: ${targetNodeId}`);
-            this.setWaitMode(''); // Release interpreter to prevent softlock
+            this.setWaitMode(''); 
         }
     };
 
-    // Custom Wait Mode override to keep Interpreter paused while our sequence runs
     const alias_Game_Interpreter_updateWaitMode = Game_Interpreter.prototype.updateWaitMode;
     Game_Interpreter.prototype.updateWaitMode = function() {
         if (this._waitMode === 'custom_dialogue') {
-            if ($gameMessage.isBusy()) return true; // Hold until player advances text/makes choice
+            if ($gameMessage.isBusy()) return true; 
             
-            // Once message window closes, route or advance
             if (this._dmPendingRoute) {
                 this.routeDialogueNode(this._dmPendingRoute);
                 this._dmPendingRoute = null;
@@ -164,10 +266,27 @@ var $dataDialogue = null;
                 this.processNextDialogueNode();
             }
             
-            // Keep waiting if we queued more text, otherwise release
             if (this._waitMode === 'custom_dialogue') return true;
             return false;
         }
         return alias_Game_Interpreter_updateWaitMode.call(this);
     };
+
+    // =========================================================================
+    // 4. Custom Icon Rendering (Baseline Alignment Fix)
+    // =========================================================================
+    
+    const alias_Window_Base_processEscapeCharacter = Window_Base.prototype.processEscapeCharacter;
+    Window_Base.prototype.processEscapeCharacter = function(code, textState) {
+        if (code === "EI") {
+            const iconIndex = this.obtainEscapeParam(textState);
+            const verticalOffset = 4; 
+            
+            this.drawIcon(iconIndex, textState.x, textState.y + verticalOffset);
+            textState.x += 24 + 2; 
+        } else {
+            alias_Window_Base_processEscapeCharacter.call(this, code, textState);
+        }
+    };
+
 })();
