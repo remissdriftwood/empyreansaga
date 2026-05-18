@@ -10,7 +10,7 @@ const MAX_LINE_WIDTH_CHARS = 50;
 
 let entitiesMap = {};
 let dialogueDB = {};
-let globalCurrencyName = "Gold"; // Fallback just in case it isn't found
+let globalCurrencyName = "Gold"; 
 
 // --- Helper: Sanitize Smart Typography ---
 function sanitizeTypography(text) {
@@ -72,7 +72,7 @@ function parseDialogue() {
 
                 // 3. Extract Actions from text and Sanitize Typography
                 let rawText = row['Dialogue'] ? row['Dialogue'] : '';
-                rawText = sanitizeTypography(rawText); // Flatten smart quotes
+                rawText = sanitizeTypography(rawText);
 
                 let actions = [];
                 const actionRegex = /\[(\w+):([^\]]+)\]/g;
@@ -108,12 +108,13 @@ function parseDialogue() {
                     node.conditionSwitch = row['Condition_Switch'].trim();
                 }
 
-                if (row['Is_Choice'] && row['Is_Choice'].toLowerCase() === 'true') {
+                // --- BUG FIX: Check for "yes" as well as "true" ---
+                let isChoiceStr = row['Is_Choice'] ? row['Is_Choice'].trim().toLowerCase() : '';
+                if (isChoiceStr === 'true' || isChoiceStr === 'yes') {
                     node.isChoice = true;
                     node.choices = [];
                     for (let i = 1; i <= 3; i++) {
                         if (row[`Choice_${i}_Text`] && row[`Choice_${i}_Target`]) {
-                            // Sanitize choice text as well
                             node.choices.push({
                                 label: sanitizeTypography(row[`Choice_${i}_Text`].trim()),
                                 targetNode: row[`Choice_${i}_Target`].trim()
@@ -146,7 +147,6 @@ async function build() {
         await parseDialogue();
         console.log(`Parsed ${Object.keys(dialogueDB).length} conversations.`);
 
-        // Force Sequential Ordering
         for (const convoId in dialogueDB) {
             dialogueDB[convoId].sort((a, b) => 
                 a.nodeId.localeCompare(b.nodeId, undefined, { numeric: true, sensitivity: 'base' })

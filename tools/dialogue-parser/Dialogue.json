@@ -1,4 +1,152 @@
 {
+  "CHEMIST_INTRO": [
+    {
+      "nodeId": "DLG_CHEMIST_INTRO_01",
+      "speaker": "",
+      "text": "Ever felt the need to use the same item in battle twice\nin a single fight?",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_CHEMIST_INTRO_02",
+      "speaker": "",
+      "text": "If so, consider bringing a Chemist with you.\nWe can duplicate items mid-combat.",
+      "actions": []
+    }
+  ],
+  "SNOOPING_IMP": [
+    {
+      "nodeId": "DLG_SNOOPING_IMP_01",
+      "speaker": "",
+      "text": "Yowza! You scared me, sneaking up on me like that!\nYeesh!",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_SNOOPING_IMP_02",
+      "speaker": "",
+      "text": "What's that? Do I live here? Nope. I'm just snooping around.\nHow about you?",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_SNOOPING_IMP_03",
+      "speaker": "",
+      "text": "I guess we're both just a couple of snoops, eh?\nWell, it's nice to meet a kindred spirit.",
+      "actions": []
+    }
+  ],
+  "BAD_COOK_B": [
+    {
+      "nodeId": "DLG_BAD_COOK_B_01",
+      "speaker": "",
+      "text": "My food tastes inconceivably bad.",
+      "actions": []
+    }
+  ],
+  "BAD_COOK_A": [
+    {
+      "nodeId": "DLG_BAD_COOK_A_01",
+      "speaker": "",
+      "text": "My husband cooks the worst food I've ever eaten.\nIt tastes inconceivably bad.",
+      "actions": []
+    }
+  ],
+  "MARTYR_INTRO": [
+    {
+      "nodeId": "DLG_MARTYR_INTRO_01",
+      "speaker": "",
+      "text": "When I meet someone new, I'm always curious to know\nwhat makes them happiest in life.",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_MARTYR_INTRO_02",
+      "speaker": "",
+      "text": "It can vary dramatically from person to person. Good food...\nTrue love... Inflicting pain... I've heard it all.",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_MARTYR_INTRO_03",
+      "speaker": "",
+      "text": "But for me, true happiness is...\nWell. Take what's in the chest behind me.\nI hope you'll understand.",
+      "actions": []
+    }
+  ],
+  "ITEM_REMINDER": [
+    {
+      "nodeId": "DLG_ITEM_REMINDER_01",
+      "speaker": "",
+      "text": "At first, I was surprised that I could only hold one\nof each item, but then I noticed my items refilled\nat the end of combat.",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_ITEM_REMINDER_02",
+      "speaker": "",
+      "text": "I guess that means this one pot of cooking oil's gonna\nlast me a lifetime!",
+      "actions": []
+    }
+  ],
+  "KNIGHT_INTRO": [
+    {
+      "nodeId": "DLG_KNIGHT_INTRO_01",
+      "speaker": "",
+      "text": "As a knight, I just can't imagine giving my up shield\nfor a two-handed sword.",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_KNIGHT_INTRO_02",
+      "speaker": "",
+      "text": "My husband says that makes me small-minded. I mean,\nI guess it does. I should try to at least conceive of life\nwithout a shield. For his sake.",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_KNIGHT_INTRO_03",
+      "speaker": "",
+      "text": "",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_KNIGHT_INTRO_04",
+      "speaker": "",
+      "text": "...",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_KNIGHT_INTRO_05",
+      "speaker": "",
+      "text": ".........",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_KNIGHT_INTRO_06",
+      "speaker": "",
+      "text": "It's no good. I can't do it.",
+      "actions": []
+    }
+  ],
+  "FIGHTER_INTRO": [
+    {
+      "nodeId": "DLG_FIGHTER_INTRO_01",
+      "speaker": "",
+      "text": "Weapons are important for a fighter! But it can be tough\nto choose what to equip in each hand.",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_FIGHTER_INTRO_02",
+      "speaker": "",
+      "text": "If I hold a sword in one hand a hammer in the other, then I can\nuse both sword and hammer skills...",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_FIGHTER_INTRO_03",
+      "speaker": "",
+      "text": "But if I hold two hammers I'll deal more damage! Of course,\nI'll only be able to use hammer skills...",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_FIGHTER_INTRO_04",
+      "speaker": "",
+      "text": "Life's tough.",
+      "actions": []
+    }
+  ],
   "INKEEPER_INTRO_TOWN_NO": [
     {
       "nodeId": "DLG_INNKEEPER_INTRO_TOWN_04",
@@ -26,7 +174,18 @@
       "nodeId": "DLG_INNKEEPER_INTRO_TOWN_02",
       "speaker": "",
       "text": "The beds're real comfy.",
-      "actions": []
+      "actions": [],
+      "isChoice": true,
+      "choices": [
+        {
+          "label": "Stay",
+          "targetNode": "EXIT:1"
+        },
+        {
+          "label": "Don't stay",
+          "targetNode": "EXIT:0"
+        }
+      ]
     }
   ],
   "SYS_MONEY_OBTAINED": [

@@ -280,7 +280,7 @@ var $dataDialogue = null;
     Window_Base.prototype.processEscapeCharacter = function(code, textState) {
         if (code === "EI") {
             const iconIndex = this.obtainEscapeParam(textState);
-            const verticalOffset = 4; 
+            const verticalOffset = 0; 
             
             this.drawIcon(iconIndex, textState.x, textState.y + verticalOffset);
             textState.x += 24 + 2; 
