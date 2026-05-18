@@ -1,0 +1,9 @@
+# Dependency directories
+node_modules/
+
+# Environment Variables (Keep Secrets Safe!)
+.env
+
+# Optional: Ignore the generated temporary CSVs so they don't clutter your commits
+Entities.csv
+Dialogue.csv
