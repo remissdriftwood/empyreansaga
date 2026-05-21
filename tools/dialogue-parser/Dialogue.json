@@ -1,4 +1,120 @@
 {
+  "SHEPHERD_INTRO_EAST_CONT": [
+    {
+      "nodeId": "DLG_SHEPHERD_INTRO_EAST_CONT_01",
+      "speaker": "",
+      "text": "Buzz off!",
+      "actions": []
+    }
+  ],
+  "SHEPHERD_INTRO_EAST": [
+    {
+      "nodeId": "DLG_SHEPHERD_INTRO_EAST_01",
+      "speaker": "",
+      "text": "Zzz...",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_SHEPHERD_INTRO_EAST_02",
+      "speaker": "{ACTOR 2}",
+      "text": "Ahem.",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_SHEPHERD_INTRO_EAST_03",
+      "speaker": "",
+      "text": "Zzz...",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_SHEPHERD_INTRO_EAST_04",
+      "speaker": "{ACTOR 2}",
+      "text": "Ahem!",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_SHEPHERD_INTRO_EAST_05",
+      "speaker": "",
+      "text": "Zzz......",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_SHEPHERD_INTRO_EAST_06",
+      "speaker": "{ACTOR 1}",
+      "text": "Let's try this...\nNgaaaaah!!",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_SHEPHERD_INTRO_EAST_07",
+      "speaker": "",
+      "text": "Holy hell! Whazzat?!",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_SHEPHERD_INTRO_EAST_08",
+      "speaker": "{ACTOR 1}",
+      "text": "Beadle patrol. Any trouble?",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_SHEPHERD_INTRO_EAST_09",
+      "speaker": "",
+      "text": "Trouble? Trouble?!\nYou think I'd be asleep if there were trouble?!\nAre all beadles nowadays as thick as you?",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_SHEPHERD_INTRO_EAST_10",
+      "speaker": "",
+      "text": "Buzz off!",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_SHEPHERD_INTRO_EAST_11",
+      "speaker": "{ACTOR 3}",
+      "text": "Just doing our job...",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_SHEPHERD_INTRO_EAST_12",
+      "speaker": "",
+      "text": "Knocking around a bunch of goopy slimes and\ndisturbing a poor shepherd at his sleep.\nReal important job you got yourself, there.",
+      "actions": []
+    }
+  ],
+  "SHEPHERD_INTRO_SOUTH_CONT": [
+    {
+      "nodeId": "DLG_SHEPHERD_INTRO_SOUTH_CONT_01",
+      "speaker": "",
+      "text": "Same time tomorrow?",
+      "actions": []
+    }
+  ],
+  "SHEPHERD_INTRO_SOUTH": [
+    {
+      "nodeId": "DLG_SHEPHERD_INTRO_SOUTH_01",
+      "speaker": "",
+      "text": "Blessings, beadles.",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_SHEPHERD_INTRO_SOUTH_02",
+      "speaker": "{ACTOR 1}",
+      "text": "Any trouble?",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_SHEPHERD_INTRO_SOUTH_03",
+      "speaker": "",
+      "text": "Nope. Not unless you count a few wobbly slimes.\nOne good smack with the 'ole crook and they\ncleared right out.",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_SHEPHERD_INTRO_SOUTH_04",
+      "speaker": "",
+      "text": "Same time tomorrow?",
+      "actions": []
+    }
+  ],
   "CHEMIST_INTRO": [
     {
       "nodeId": "DLG_CHEMIST_INTRO_01",
