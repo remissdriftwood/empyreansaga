@@ -373,7 +373,7 @@
   "NEW_PLAYER_INTRO_SMALLTALK": [
     {
       "nodeId": "DLG_NEW_PLAYER_INTRO_04",
-      "speaker": "",
+      "speaker": "Brother Polenta",
       "text": "Bless you for your work patrolling\nthe pastures. It may not be exciting\nbut it's important. The people\nrely on you.",
       "actions": [],
       "conditionSwitch": "001_MAIN_PASTURE_PATROL"
@@ -417,20 +417,20 @@
   "NEW_PLAYER_INTRO": [
     {
       "nodeId": "DLG_NEW_PLAYER_INTRO_01",
-      "speaker": "",
+      "speaker": "Brother Polenta",
       "text": "All beadles are welcome here. Speaking of,\nhave you had a chance to meet any fellow beadles yet?",
       "actions": []
     },
     {
       "nodeId": "DLG_NEW_PLAYER_INTRO_02",
-      "speaker": "",
+      "speaker": "Brother Polenta",
       "text": "There are always brave folk willing to lay down\ntheir lives to help those less fortunate.",
       "actions": []
     },
     {
       "nodeId": "DLG_NEW_PLAYER_INTRO_03",
-      "speaker": "",
-      "text": "Beadle faire cleric in the chancel above should\nbe able to introduce you to many\nsuch beadles. Pray speak with him\nbefore you leave.",
+      "speaker": "Brother Polenta",
+      "text": "Sister Dal in the chancel above should\nbe able to introduce you to many\nsuch beadles. Pray speak with her\nbefore you leave.",
       "actions": []
     }
   ]

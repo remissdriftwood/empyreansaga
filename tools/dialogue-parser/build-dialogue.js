@@ -4,15 +4,20 @@ const csv = require('csv-parser');
 const ENTITIES_FILE = 'Entities.csv';
 const DIALOGUE_FILE = 'Dialogue.csv';
 const DIALOGUE_OUTPUT = 'Dialogue.json';
-const SHOPS_OUTPUT = 'Shops.json'; // New micro-file
+const SHOPS_OUTPUT = 'Shops.json'; 
 
 // Configuration for your custom font validation
 const MAX_LINE_WIDTH_CHARS = 50; 
 
 let entitiesMap = {};
 let dialogueDB = {};
-let shopsDB = {}; // New database for shops
+let shopsDB = {}; 
 let globalCurrencyName = "Gold"; 
+
+// --- Helper: Escape Regex ---
+function escapeRegExp(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 // --- Helper: Sanitize Smart Typography ---
 function sanitizeTypography(text) {
@@ -21,6 +26,35 @@ function sanitizeTypography(text) {
         .replace(/[\u2018\u2019]/g, "'") // Left/Right single quotes
         .replace(/[\u201C\u201D]/g, '"') // Left/Right double quotes
         .replace(/\u2026/g, "...");      // Single-character ellipsis
+}
+
+// --- Helper: Swap Inline Entity Mentions ---
+function swapEntityMentions(text) {
+    if (!text) return '';
+    let processedText = text;
+    
+    // Sort keys by length descending to avoid partial word replacements
+    const sortedEntities = Object.keys(entitiesMap).sort((a, b) => b.length - a.length);
+    
+    for (const internalName of sortedEntities) {
+        // If they have a blank DisplayName, fall back to Internal Name for inline text 
+        // so the word doesn't just disappear from the sentence.
+        const dispName = entitiesMap[internalName].displayName;
+        const mentionReplacement = dispName !== '' ? dispName : internalName;
+
+        // Only run the swap if the replacement is actually different from the internal name
+        if (internalName && mentionReplacement !== internalName) {
+            
+            // 1. Target the manual CSV export format: "Name (https://www.notion.so/...)"
+            const urlMentionRegex = new RegExp(`${escapeRegExp(internalName)}\\s*\\(https:\\/\\/www\\.notion\\.so\\/[^)]+\\)`, 'gi');
+            processedText = processedText.replace(urlMentionRegex, mentionReplacement);
+
+            // 2. Target the API format or plain text: "@Name" or just "Name"
+            const plainMentionRegex = new RegExp(`@?${escapeRegExp(internalName)}`, 'gi');
+            processedText = processedText.replace(plainMentionRegex, mentionReplacement);
+        }
+    }
+    return processedText;
 }
 
 // --- STEP 1: Parse Entities & Shops ---
@@ -34,12 +68,16 @@ function parseEntities() {
                 if (!internalName) return;
 
                 let displayName = internalName;
+                
+                // BUG FIX: Trust the DisplayName column entirely. 
+                // If it is blank in Notion, we WANT it to be blank here.
                 if (row['DisplayName'] !== undefined) {
                     displayName = row['DisplayName'].trim();
                 }
 
                 if (entityId === 'SYSTEM_CURRENCY' || internalName === 'SYSTEM_CURRENCY') {
-                    globalCurrencyName = (row['DisplayName'] !== undefined && row['DisplayName'].trim() !== '') ? row['DisplayName'].trim() : internalName;
+                    // Currency needs a strict fallback so {CURRENCY} doesn't render as nothing
+                    globalCurrencyName = displayName !== '' ? displayName : internalName;
                 }
 
                 // Standard Entity Mapping
@@ -48,18 +86,16 @@ function parseEntities() {
                     displayName: displayName
                 };
 
-                // NEW: Process INVENTORY column for Shops.json
+                // Process INVENTORY column for Shops.json
                 const inventoryRaw = row['INVENTORY'] ? row['INVENTORY'].trim() : '';
                 if (inventoryRaw && entityId) {
                     const goodsMatrix = [];
-                    // Split by comma and allow optional spacing
                     const items = inventoryRaw.split(',');
                     
                     for (let itemStr of items) {
                         itemStr = itemStr.trim();
                         if (!itemStr) continue;
                         
-                        // Regex to match Format: T:ID or T:ID=PRICE (e.g., W:5, I:1=500)
                         const match = itemStr.match(/^([IWAiwa]):(\d+)(?:=(\d+))?$/);
                         
                         if (match) {
@@ -67,12 +103,10 @@ function parseEntities() {
                             const itemId = parseInt(match[2], 10);
                             const customPrice = match[3] ? parseInt(match[3], 10) : 0;
                             
-                            // Map to MZ type ID: 0 = Item, 1 = Weapon, 2 = Armor
                             let typeId = 0;
                             if (typeChar === 'W') typeId = 1;
                             if (typeChar === 'A') typeId = 2;
                             
-                            // Map MZ custom price flag: 0 = Default, 1 = Custom
                             const priceFlag = match[3] ? 1 : 0;
                             
                             goodsMatrix.push([typeId, itemId, priceFlag, customPrice]);
@@ -103,7 +137,7 @@ function parseDialogue() {
                 let rawSpeaker = row['Speaker'] ? row['Speaker'].trim() : '';
                 let cleanSpeakerName = rawSpeaker.replace(/\s*\(https:\/\/www\.notion\.so\/.*?\)/g, '').trim();
                 
-                // 2. Resolve against Entities map
+                // 2. Resolve against Entities map (If DisplayName is '', it stays '')
                 let finalSpeaker = cleanSpeakerName; 
                 if (entitiesMap[cleanSpeakerName]) {
                     finalSpeaker = entitiesMap[cleanSpeakerName].displayName;
@@ -126,8 +160,9 @@ function parseDialogue() {
                     return ''; 
                 }).trim();
 
-                // 4. Compile-Time Currency Tag Swap
+                // 4. Compile-Time Tag Swaps
                 cleanText = cleanText.replace(/\{CURRENCY\}/g, globalCurrencyName);
+                cleanText = swapEntityMentions(cleanText); // <-- SWAP INLINE MENTIONS
 
                 // 5. Validate Line Widths
                 const lines = cleanText.split('\n');
@@ -155,8 +190,9 @@ function parseDialogue() {
                     node.choices = [];
                     for (let i = 1; i <= 3; i++) {
                         if (row[`Choice_${i}_Text`] && row[`Choice_${i}_Target`]) {
+                            // Also swap mentions inside choice buttons!
                             node.choices.push({
-                                label: sanitizeTypography(row[`Choice_${i}_Text`].trim()),
+                                label: swapEntityMentions(sanitizeTypography(row[`Choice_${i}_Text`].trim())),
                                 targetNode: row[`Choice_${i}_Target`].trim()
                             });
                         }
