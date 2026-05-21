@@ -3,7 +3,7 @@
     {
       "nodeId": "DLG_CHEMIST_INTRO_01",
       "speaker": "",
-      "text": "Ever felt the need to use the same item in battle twice\nin a single fight?",
+      "text": "Ever felt the need to use the same item twice\nin a single fight?",
       "actions": []
     },
     {
@@ -382,7 +382,7 @@
   "INTRO_QUEST_CLERIC_CARAVAN": [
     {
       "nodeId": "DLG_INTRO_QUEST_CLERIC_05",
-      "speaker": "",
+      "speaker": "Brother Migas",
       "text": "Done with patrols? Good on you.",
       "actions": [],
       "conditionSwitch": "001_MAIN_PASTURE_PATROL"
@@ -391,25 +391,25 @@
   "INTRO_QUEST_CLERIC_PATROL": [
     {
       "nodeId": "DLG_INTRO_QUEST_CLERIC_01",
-      "speaker": "",
+      "speaker": "Brother Migas",
       "text": "Blessings and all that. Been out to visit\nthe pastures yet?",
       "actions": []
     },
     {
       "nodeId": "DLG_INTRO_QUEST_CLERIC_02",
-      "speaker": "",
+      "speaker": "Brother Migas",
       "text": "Daily patrols may not be glamorous,\nbut at least they're... Oh, Who am I\nfooling? They suck.",
       "actions": []
     },
     {
       "nodeId": "DLG_INTRO_QUEST_CLERIC_03",
-      "speaker": "",
+      "speaker": "Brother Migas",
       "text": "Good thing they're your job, not mine!",
       "actions": []
     },
     {
       "nodeId": "DLG_INTRO_QUEST_CLERIC_04",
-      "speaker": "",
+      "speaker": "Brother Migas",
       "text": "...I guess I shouldn't say that, as a\ncleric and all. \nHave fun!",
       "actions": []
     }
@@ -430,7 +430,7 @@
     {
       "nodeId": "DLG_NEW_PLAYER_INTRO_03",
       "speaker": "",
-      "text": "My brother in the chancel above should\nbe able to introduce you to many\nsuch beadles. Pray speak with him\nbefore you leave.",
+      "text": "Beadle faire cleric in the chancel above should\nbe able to introduce you to many\nsuch beadles. Pray speak with him\nbefore you leave.",
       "actions": []
     }
   ]

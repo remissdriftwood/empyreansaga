@@ -100,4 +100,31 @@
         return _Window_ItemCategory_maxCols.call(this);
     };
 
+    //=============================================================================
+    // 3. Shop Retro Layout Fixes (544x416 Support)
+    //=============================================================================
+
+    // 1. Shrink the right-side status window from 312px down to 200px.
+    // This gives the left-side Buy window an extra 112 pixels of width.
+    Scene_Shop.prototype.statusWidth = function() {
+        return 200; 
+    };
+
+    // 2. Reduce the width reserved for the price text (Default is 96px).
+    Window_ShopBuy.prototype.priceWidth = function() {
+        return 72; 
+    };
+
+    //=============================================================================
+    // 4. Shop UI Aesthetics (Remove native MZ dark bars)
+    //=============================================================================
+
+    // 1. Remove the thick horizontal separator line in the Quantity Window
+    Window_ShopNumber.prototype.drawHorzLine = function() {};
+
+    // 2. Remove the dark background rectangles behind list items
+    Window_ShopBuy.prototype.drawItemBackground = function(index) {};
+    Window_ShopSell.prototype.drawItemBackground = function(index) {};
+    Window_ItemCategory.prototype.drawItemBackground = function(index) {};
+
 })();

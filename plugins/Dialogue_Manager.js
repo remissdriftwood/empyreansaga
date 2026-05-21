@@ -69,9 +69,20 @@
  * @desc The amount of currency obtained.
  * @type number
  * @default 100
+ * 
+ * * @command OpenShop
+ * @text Open Shop
+ * @desc Opens a native shop screen using data mapped from Notion.
+ *
+ * @arg EntityID
+ * @text Entity ID
+ * @desc The Entity ID from Notion (e.g., NPC_BLACKSMITH_01)
+ * @type string
+ * 
  */
 
 var $dataDialogue = null;
+var $dataShops = null;
 
 (() => {
     const pluginName = "Dialogue_Manager";
@@ -87,6 +98,7 @@ var $dataDialogue = null;
     DataManager.loadDatabase = function() {
         alias_DataManager_loadDatabase.call(this);
         DataManager.loadDataFile('$dataDialogue', 'Dialogue.json');
+        DataManager.loadDataFile('$dataShops', 'Shops.json');
     };
 
     // =========================================================================
@@ -125,6 +137,22 @@ var $dataDialogue = null;
         
         this._dmInjectedAmount = parseInt(args.Amount, 10);
         this.setupDialogueConversation(convoId);
+    });
+
+    PluginManager.registerCommand(pluginName, "OpenShop", function(args) {
+    const entityId = args.EntityID;
+    
+    // Check if the shop exists in our micro-file
+    if (!$dataShops || !$dataShops[entityId]) {
+        console.warn(`[Shop Manager] Shop data not found for Entity ID: ${entityId}`);
+        return;
+    }
+
+    // Grab the matrix and push the native shop scene
+    const goodsMatrix = $dataShops[entityId];
+    
+    SceneManager.push(Scene_Shop);
+    SceneManager.prepareNextScene(goodsMatrix, false); 
     });
 
     // =========================================================================

@@ -3,13 +3,15 @@ const csv = require('csv-parser');
 
 const ENTITIES_FILE = 'Entities.csv';
 const DIALOGUE_FILE = 'Dialogue.csv';
-const OUTPUT_FILE = 'Dialogue.json';
+const DIALOGUE_OUTPUT = 'Dialogue.json';
+const SHOPS_OUTPUT = 'Shops.json'; // New micro-file
 
 // Configuration for your custom font validation
 const MAX_LINE_WIDTH_CHARS = 50; 
 
 let entitiesMap = {};
 let dialogueDB = {};
+let shopsDB = {}; // New database for shops
 let globalCurrencyName = "Gold"; 
 
 // --- Helper: Sanitize Smart Typography ---
@@ -21,7 +23,7 @@ function sanitizeTypography(text) {
         .replace(/\u2026/g, "...");      // Single-character ellipsis
 }
 
-// --- STEP 1: Parse Entities ---
+// --- STEP 1: Parse Entities & Shops ---
 function parseEntities() {
     return new Promise((resolve) => {
         fs.createReadStream(ENTITIES_FILE)
@@ -40,10 +42,49 @@ function parseEntities() {
                     globalCurrencyName = (row['DisplayName'] !== undefined && row['DisplayName'].trim() !== '') ? row['DisplayName'].trim() : internalName;
                 }
 
+                // Standard Entity Mapping
                 entitiesMap[internalName] = {
                     internalName: internalName,
                     displayName: displayName
                 };
+
+                // NEW: Process INVENTORY column for Shops.json
+                const inventoryRaw = row['INVENTORY'] ? row['INVENTORY'].trim() : '';
+                if (inventoryRaw && entityId) {
+                    const goodsMatrix = [];
+                    // Split by comma and allow optional spacing
+                    const items = inventoryRaw.split(',');
+                    
+                    for (let itemStr of items) {
+                        itemStr = itemStr.trim();
+                        if (!itemStr) continue;
+                        
+                        // Regex to match Format: T:ID or T:ID=PRICE (e.g., W:5, I:1=500)
+                        const match = itemStr.match(/^([IWAiwa]):(\d+)(?:=(\d+))?$/);
+                        
+                        if (match) {
+                            const typeChar = match[1].toUpperCase();
+                            const itemId = parseInt(match[2], 10);
+                            const customPrice = match[3] ? parseInt(match[3], 10) : 0;
+                            
+                            // Map to MZ type ID: 0 = Item, 1 = Weapon, 2 = Armor
+                            let typeId = 0;
+                            if (typeChar === 'W') typeId = 1;
+                            if (typeChar === 'A') typeId = 2;
+                            
+                            // Map MZ custom price flag: 0 = Default, 1 = Custom
+                            const priceFlag = match[3] ? 1 : 0;
+                            
+                            goodsMatrix.push([typeId, itemId, priceFlag, customPrice]);
+                        } else {
+                            console.warn(`\x1b[33m[WARNING] Invalid inventory syntax on ${internalName}: "${itemStr}"\x1b[0m`);
+                        }
+                    }
+                    
+                    if (goodsMatrix.length > 0) {
+                        shopsDB[entityId] = goodsMatrix;
+                    }
+                }
             })
             .on('end', () => resolve());
     });
@@ -108,7 +149,6 @@ function parseDialogue() {
                     node.conditionSwitch = row['Condition_Switch'].trim();
                 }
 
-                // --- BUG FIX: Check for "yes" as well as "true" ---
                 let isChoiceStr = row['Is_Choice'] ? row['Is_Choice'].trim().toLowerCase() : '';
                 if (isChoiceStr === 'true' || isChoiceStr === 'yes') {
                     node.isChoice = true;
@@ -143,6 +183,7 @@ async function build() {
     try {
         await parseEntities();
         console.log(`Loaded ${Object.keys(entitiesMap).length} entities.`);
+        console.log(`Extracted ${Object.keys(shopsDB).length} shop inventories.`);
         
         await parseDialogue();
         console.log(`Parsed ${Object.keys(dialogueDB).length} conversations.`);
@@ -153,8 +194,13 @@ async function build() {
             );
         }
 
-        fs.writeFileSync(OUTPUT_FILE, JSON.stringify(dialogueDB, null, 2));
-        console.log(`\x1b[32m[SUCCESS] Wrote ${OUTPUT_FILE}\x1b[0m`);
+        // Write both files
+        fs.writeFileSync(DIALOGUE_OUTPUT, JSON.stringify(dialogueDB, null, 2));
+        console.log(`\x1b[32m[SUCCESS] Wrote ${DIALOGUE_OUTPUT}\x1b[0m`);
+
+        fs.writeFileSync(SHOPS_OUTPUT, JSON.stringify(shopsDB, null, 2));
+        console.log(`\x1b[32m[SUCCESS] Wrote ${SHOPS_OUTPUT}\x1b[0m`);
+        
     } catch (err) {
         console.error("Build failed:", err);
     }
