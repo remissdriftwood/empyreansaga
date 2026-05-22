@@ -1,4 +1,26 @@
 {
+  "DLG_SHEEP": [
+    {
+      "nodeId": "DLG_SHEEP_01",
+      "speaker": "",
+      "text": "Baa.",
+      "actions": []
+    }
+  ],
+  "SHEPHERD_INTRO_NORTHWEST": [
+    {
+      "nodeId": "DLG_SHEPHERD_INTRO_NORTHWEST_01",
+      "speaker": "{ACTOR_4}",
+      "text": "Uh oh...",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_SHEPHERD_INTRO_NORTHWEST_02",
+      "speaker": "{ACTOR_2}",
+      "text": "Here they come!",
+      "actions": []
+    }
+  ],
   "SHEPHERD_INTRO_EAST_CONT": [
     {
       "nodeId": "DLG_SHEPHERD_INTRO_EAST_CONT_01",
@@ -16,7 +38,7 @@
     },
     {
       "nodeId": "DLG_SHEPHERD_INTRO_EAST_02",
-      "speaker": "{ACTOR 2}",
+      "speaker": "{ACTOR_2}",
       "text": "Ahem.",
       "actions": []
     },
@@ -28,7 +50,7 @@
     },
     {
       "nodeId": "DLG_SHEPHERD_INTRO_EAST_04",
-      "speaker": "{ACTOR 2}",
+      "speaker": "{ACTOR_2}",
       "text": "Ahem!",
       "actions": []
     },
@@ -40,7 +62,7 @@
     },
     {
       "nodeId": "DLG_SHEPHERD_INTRO_EAST_06",
-      "speaker": "{ACTOR 1}",
+      "speaker": "{ACTOR_1}",
       "text": "Let's try this...\nNgaaaaah!!",
       "actions": []
     },
@@ -52,7 +74,7 @@
     },
     {
       "nodeId": "DLG_SHEPHERD_INTRO_EAST_08",
-      "speaker": "{ACTOR 1}",
+      "speaker": "{ACTOR_1}",
       "text": "Beadle patrol. Any trouble?",
       "actions": []
     },
@@ -70,7 +92,7 @@
     },
     {
       "nodeId": "DLG_SHEPHERD_INTRO_EAST_11",
-      "speaker": "{ACTOR 3}",
+      "speaker": "{ACTOR_3}",
       "text": "Just doing our job...",
       "actions": []
     },
@@ -98,7 +120,7 @@
     },
     {
       "nodeId": "DLG_SHEPHERD_INTRO_SOUTH_02",
-      "speaker": "{ACTOR 1}",
+      "speaker": "{ACTOR_1}",
       "text": "Any trouble?",
       "actions": []
     },

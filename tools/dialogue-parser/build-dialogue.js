@@ -69,7 +69,7 @@ function parseEntities() {
 
                 let displayName = internalName;
                 
-                // BUG FIX: Trust the DisplayName column entirely. 
+                // Trust the DisplayName column entirely. 
                 // If it is blank in Notion, we WANT it to be blank here.
                 if (row['DisplayName'] !== undefined) {
                     displayName = row['DisplayName'].trim();

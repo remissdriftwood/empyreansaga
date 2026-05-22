@@ -69,8 +69,8 @@
  * @desc The amount of currency obtained.
  * @type number
  * @default 100
- * 
- * * @command OpenShop
+ *
+ * @command OpenShop
  * @text Open Shop
  * @desc Opens a native shop screen using data mapped from Notion.
  *
@@ -78,7 +78,6 @@
  * @text Entity ID
  * @desc The Entity ID from Notion (e.g., NPC_BLACKSMITH_01)
  * @type string
- * 
  */
 
 var $dataDialogue = null;
@@ -140,19 +139,17 @@ var $dataShops = null;
     });
 
     PluginManager.registerCommand(pluginName, "OpenShop", function(args) {
-    const entityId = args.EntityID;
-    
-    // Check if the shop exists in our micro-file
-    if (!$dataShops || !$dataShops[entityId]) {
-        console.warn(`[Shop Manager] Shop data not found for Entity ID: ${entityId}`);
-        return;
-    }
+        const entityId = args.EntityID;
+        
+        if (!$dataShops || !$dataShops[entityId]) {
+            console.warn(`[Shop Manager] Shop data not found for Entity ID: ${entityId}`);
+            return;
+        }
 
-    // Grab the matrix and push the native shop scene
-    const goodsMatrix = $dataShops[entityId];
-    
-    SceneManager.push(Scene_Shop);
-    SceneManager.prepareNextScene(goodsMatrix, false); 
+        const goodsMatrix = $dataShops[entityId];
+        
+        SceneManager.push(Scene_Shop);
+        SceneManager.prepareNextScene(goodsMatrix, false); 
     });
 
     // =========================================================================
@@ -188,6 +185,7 @@ var $dataShops = null;
 
         const node = convo[this._dmNodeIndex];
 
+        // --- CONDITION SWITCH CHECK ---
         if (node.conditionSwitch) {
             const match = node.conditionSwitch.match(/^0*(\d+)/); 
             if (match) {
@@ -200,17 +198,45 @@ var $dataShops = null;
             }
         }
 
-        $gameMessage.newPage();
+        // --- DYNAMIC ACTOR SKIP LOGIC ---
+        let skipNode = false;
+        let speakerName = node.speaker || "";
 
-        if (node.speaker && node.speaker.trim() !== "") {
-            $gameMessage.setSpeakerName(node.speaker);
-        } else {
-            $gameMessage.setSpeakerName(""); 
+        speakerName = speakerName.replace(/\{ACTOR_(\d+)\}/g, (match, p1) => {
+            const actorIndex = parseInt(p1, 10) - 1; // 1-based to 0-based array index
+            const partyMembers = $gameParty.members();
+            
+            if (actorIndex >= partyMembers.length) {
+                skipNode = true; // Actor doesn't exist in party, trigger the skip
+                return match; 
+            }
+            return partyMembers[actorIndex].name(); // Swap with dynamic name
+        });
+
+        // If the speaker is missing, silently proceed to the next sequential node
+        if (skipNode) {
+            this._dmPendingRoute = null; 
+            this._dmNodeIndex++;
+            this.processNextDialogueNode();
+            return;
         }
+
+        // --- RENDER TEXT WINDOW ---
+        $gameMessage.newPage();
+        $gameMessage.setSpeakerName(speakerName);
 
         // --- INJECTION LOGIC ---
         let processedText = node.text;
+
+        // Resolve {ACTOR_X} tags within the dialogue text itself
+        processedText = processedText.replace(/\{ACTOR_(\d+)\}/g, (match, p1) => {
+            const actorIndex = parseInt(p1, 10) - 1;
+            const partyMembers = $gameParty.members();
+            if (actorIndex >= partyMembers.length) return ""; // Erase tag if missing
+            return partyMembers[actorIndex].name();
+        });
         
+        // Item & Currency Injection
         if (this._dmInjectedItemID > 0) {
             let itemObj = null;
             if (this._dmInjectedItemType === 'item') itemObj = $dataItems[this._dmInjectedItemID];
@@ -232,6 +258,7 @@ var $dataShops = null;
             $gameMessage.add(line);
         }
 
+        // --- ACTIONS & CHOICES ---
         if (node.actions && node.actions.length > 0) {
             for (const action of node.actions) {
                 if (action.type.toLowerCase() === 'wait') {
@@ -258,14 +285,13 @@ var $dataShops = null;
     };
 
     Game_Interpreter.prototype.routeDialogueNode = function(targetNodeId) {
-        // --- NEW EXIT CODE LOGIC ---
         if (targetNodeId.toUpperCase().startsWith('EXIT')) {
             const parts = targetNodeId.split(':');
             if (parts.length > 1) {
                 const exitCode = parseInt(parts[1], 10);
                 $gameVariables.setValue(resultVarId, exitCode);
             } else {
-                $gameVariables.setValue(resultVarId, 0); // Default to 0 if just "EXIT"
+                $gameVariables.setValue(resultVarId, 0); 
             }
             this.setWaitMode('');
             return;
