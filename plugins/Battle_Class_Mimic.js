@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 5: Mimic Class Mechanics v1.4
+ * @plugindesc Phase 5: Mimic Class Mechanics v1.6
  * @author Custom Build
  * * @command StartMimicDialogue
  * @text Start Mimic Dialogue
@@ -103,6 +103,14 @@
         // Apply full HP/MP restore and cure ailments after stat recalculation
         this.recoverAll();
         this.refresh();
+        
+        // Force the map to instantly redraw the player sprite
+        if (typeof $gamePlayer !== 'undefined' && $gamePlayer) {
+            $gamePlayer.refresh();
+        }
+        if (typeof $gameMap !== 'undefined' && $gameMap) {
+            $gameMap.requestRefresh();
+        }
     };
 
     const _Game_Actor_equipSlots = Game_Actor.prototype.equipSlots;
@@ -257,22 +265,36 @@
         $gameTemp._lastKilledEnemyId = null;
     };
 
-    const _BattleManager_displayVictoryMessage = BattleManager.displayVictoryMessage;
-    BattleManager.displayVictoryMessage = function() {
+    const _BattleManager_processVictory = BattleManager.processVictory;
+    BattleManager.processVictory = function() {
         const mimics = $gameParty.members().filter(a => a._classId === CONFIG.MIMIC_CLASS_ID && a.isAlive());
-        
+
         if (mimics.length > 0 && $gameTemp._lastKilledEnemyId) {
             const targetEnemyId = $gameTemp._lastKilledEnemyId;
             $gameTemp._lastKilledEnemyId = null; 
             
             if (SceneManager._scene instanceof Scene_Battle) {
+                // Execute initial victory animations
+                $gameParty.removeBattleStates();
+                $gameParty.performVictory();
+                this.playVictoryMe();
+                this.replayBgmAndBgs();
+                
+                // Suspend native BattleManager processing
+                this._phase = 'mimicFlow';
+                
+                // Trigger Custom UI. Pass the remainder of the victory sequence as the callback.
                 SceneManager._scene.startMimicFlow(targetEnemyId, () => {
-                    _BattleManager_displayVictoryMessage.call(this); 
+                    this.makeRewards();
+                    this.displayVictoryMessage();
+                    this.displayRewards();
+                    this.gainRewards();
+                    this.endBattle(0);
                 });
-                return;
+                return; // Break out to prevent synchronous execution of rewards
             }
         }
-        _BattleManager_displayVictoryMessage.call(this);
+        _BattleManager_processVictory.call(this);
     };
 
     //=============================================================================
