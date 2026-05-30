@@ -162,6 +162,7 @@ var $dataShops = null;
         this._dmConvoId = null;
         this._dmNodeIndex = 0;
         this._dmPendingRoute = null;
+        this._dmWaitingForRouteTarget = null;
         
         this._dmInjectedItemType = null;
         this._dmInjectedItemID = 0;
@@ -261,9 +262,66 @@ var $dataShops = null;
         // --- ACTIONS & CHOICES ---
         if (node.actions && node.actions.length > 0) {
             for (const action of node.actions) {
-                if (action.type.toLowerCase() === 'wait') {
+                const type = action.type.toLowerCase();
+                
+                if (type === 'wait') {
                     const frames = parseInt(action.params[0], 10);
                     this.wait(frames); 
+                    continue;
+                }
+
+                // Parse Route/Stat Commands (e.g., "0:U-R" or "0:0")
+                let targetId = 0;
+                let cmdData = "";
+                let secondaryData = ""; 
+
+                if (action.params.length > 0) {
+                    const firstPart = action.params[0].split(':');
+                    targetId = parseInt(firstPart[0], 10) || 0;
+                    cmdData = firstPart.length > 1 ? firstPart[1] : "";
+                    secondaryData = action.params.length > 1 ? action.params[1] : ""; // Catches jump's comma
+                }
+
+                const moveCodes = { 'D': 1, 'L': 2, 'R': 3, 'U': 4 };
+                const turnCodes = { 'D': 16, 'L': 17, 'R': 18, 'U': 19 };
+
+                let list = [];
+                let waitForCompletion = false;
+
+                switch(type) {
+                    case 'turn':
+                    case 'turnnowait':
+                        waitForCompletion = (type === 'turn');
+                        const tDirs = cmdData.split('-');
+                        for (const d of tDirs) {
+                            if (turnCodes[d.toUpperCase()]) list.push({ code: turnCodes[d.toUpperCase()], parameters: [] });
+                        }
+                        break;
+                    case 'move':
+                    case 'movenowait':
+                        waitForCompletion = (type === 'move');
+                        const mDirs = cmdData.split('-');
+                        for (const d of mDirs) {
+                            if (moveCodes[d.toUpperCase()]) list.push({ code: moveCodes[d.toUpperCase()], parameters: [] });
+                        }
+                        break;
+                    case 'jump':
+                    case 'jumpnowait':
+                        waitForCompletion = (type === 'jump');
+                        const x = parseInt(cmdData, 10) || 0;
+                        const y = parseInt(secondaryData, 10) || 0;
+                        list.push({ code: 14, parameters: [x, y] });
+                        break;
+                    case 'speed':
+                        list.push({ code: 29, parameters: [parseInt(cmdData, 10) || 4] });
+                        break;
+                    case 'freq':
+                        list.push({ code: 30, parameters: [parseInt(cmdData, 10) || 3] });
+                        break;
+                }
+
+                if (list.length > 0) {
+                    this.dmApplyRoute(targetId, waitForCompletion, list);
                 }
             }
         }
@@ -313,6 +371,15 @@ var $dataShops = null;
         if (this._waitMode === 'custom_dialogue') {
             if ($gameMessage.isBusy()) return true; 
             
+            // Wait for Blocking Movement Routes
+            if (this._dmWaitingForRouteTarget) {
+                if (this._dmWaitingForRouteTarget.isMoveRouteForcing()) {
+                    return true; 
+                } else {
+                    this._dmWaitingForRouteTarget = null; 
+                }
+            }
+            
             if (this._dmPendingRoute) {
                 this.routeDialogueNode(this._dmPendingRoute);
                 this._dmPendingRoute = null;
@@ -324,6 +391,24 @@ var $dataShops = null;
             return false;
         }
         return alias_Game_Interpreter_updateWaitMode.call(this);
+    };
+
+    Game_Interpreter.prototype.dmApplyRoute = function(targetId, waitForCompletion, list) {
+        // this.character natively handles -1 (Player), 0 (This Event), and 1+ (Event ID)
+        const character = this.character(targetId);
+        if (!character) return;
+        
+        const route = {
+            list: [...list, { code: 0 }], // MZ requires code 0 to mark the route's end
+            repeat: false,
+            skippable: false,
+            wait: waitForCompletion
+        };
+        
+        character.forceMoveRoute(route);
+        if (waitForCompletion) {
+            this._dmWaitingForRouteTarget = character;
+        }
     };
 
     // =========================================================================

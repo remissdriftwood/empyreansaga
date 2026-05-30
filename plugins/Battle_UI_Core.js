@@ -784,8 +784,13 @@
         Sprite.prototype.initialize.call(this);
         this._targetSprite = targetSprite;
         
-        this.bitmap = ImageManager.loadSystem(animName);
-        this.bitmap.smooth = false; 
+        // NEW: Support for intentional skips (e.g. <Anim: none, FireSound>)
+        if (animName && animName.toLowerCase() !== "none") {
+            this.bitmap = ImageManager.loadSystem(animName);
+            this.bitmap.smooth = false; 
+        } else {
+            this.bitmap = null; // Explicitly skip image loading
+        }
         
         this.anchor.x = 0.5;
         this.anchor.y = 0.5; 
@@ -798,6 +803,40 @@
         this._maxFrames = 4;
         this._ticksPerFrame = 4; 
         this._isPlaying = true;
+    };
+
+    Sprite_RetroAnim.prototype.update = function() {
+        Sprite.prototype.update.call(this);
+        if (!this._isPlaying) return;
+        
+        // --- THE FIX: GRACEFUL FAILURE ---
+        // If the bitmap is explicitly skipped OR fails to load (isError),
+        // instantly destroy the sprite and free up the battle sequence.
+        if (!this.bitmap || this.bitmap.isError()) {
+            this._isPlaying = false;
+            if (this.parent) this.parent.removeChild(this);
+            return;
+        }
+        // ---------------------------------
+
+        if (!this.bitmap.isReady()) return; 
+        
+        if (!this.visible) {
+            this.visible = true;
+        }
+        
+        this.updatePosition();
+        this.updateFrame();
+        
+        this._tick++;
+        if (this._tick >= this._ticksPerFrame) {
+            this._tick = 0;
+            this._frameIndex++;
+            if (this._frameIndex >= this._maxFrames) {
+                this._isPlaying = false;
+                if (this.parent) this.parent.removeChild(this);
+            }
+        }
     };
 
     Sprite_RetroAnim.prototype.update = function() {

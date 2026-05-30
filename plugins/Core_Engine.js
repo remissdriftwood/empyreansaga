@@ -752,4 +752,15 @@
         _Scene_Battle_commandItem.call(this);
     };
 
+    /*:
+    * @target MZ
+    * @plugindesc Completely disables and hides all engine-generated map tile shadows.
+    * @author Community
+    * @help Forcefully overwrites the shadow layer alpha to 0.
+    */
+
+    Tilemap.prototype._drawShadow = function(bitmap, shadowBits, x, y) {
+        // Overwritten to do nothing, preventing automatic shadows from drawing.
+    };
+
 })();

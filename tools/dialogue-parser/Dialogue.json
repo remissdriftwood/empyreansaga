@@ -1,13 +1,265 @@
 {
-  "DLG_SHEEP": [
+  "INTRO_MOUNTAIN_GUARDS_AFTER_CARAVAN_GUARD_02": [
     {
-      "nodeId": "DLG_SHEEP_01",
-      "speaker": "",
-      "text": "Baa.",
+      "nodeId": "DLG_INTRO_MOUNTAIN_GUARDS_AFTER_CARAVAN_GUARD_02_01",
+      "speaker": "Knight Flambé",
+      "text": "Sigh... Poor Arepas. That's no way for anyone\nto go.",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_INTRO_MOUNTAIN_GUARDS_AFTER_CARAVAN_GUARD_02_02",
+      "speaker": "Knight Flambé",
+      "text": "Get back to Colcannon and let Brother Migas know\nwhat happened. Two deaths in one day, not to mention the\npoor sheep... God have mercy.",
+      "actions": []
+    }
+  ],
+  "INTRO_MOUNTAIN_GUARDS_AFTER_CARAVAN_GUARD_01": [
+    {
+      "nodeId": "DLG_INTRO_MOUNTAIN_GUARDS_AFTER_CARAVAN_GUARD_01_01",
+      "speaker": "Fighter Shank",
+      "text": "You couldn't save her?! Damn! Damn!!\nAt least you busted 'em up good.",
+      "actions": []
+    }
+  ],
+  "INTRO_MOUNTAIN_GUARDS_AFTER_PASTURE_GUARD_02_CONT": [
+    {
+      "nodeId": "DLG_INTRO_MOUNTAIN_GUARDS_AFTER_PASTURE_GUARD_02_CONT_01",
+      "speaker": "Knight Flambé",
+      "text": "Find Arepas, and fast.",
+      "actions": []
+    }
+  ],
+  "INTRO_MOUNTAIN_GUARDS_AFTER_PASTURE_GUARD_01_CONT": [
+    {
+      "nodeId": "DLG_INTRO_MOUNTAIN_GUARDS_AFTER_PASTURE_GUARD_01_CONT_01",
+      "speaker": "Fighter Shank",
+      "text": "Give 'em hell from me, then.",
+      "actions": []
+    }
+  ],
+  "INTRO_MOUNTAIN_GUARDS_AFTER_PASTURE": [
+    {
+      "nodeId": "DLG_INTRO_MOUNTAIN_GUARDS_AFTER_PASTURE_01",
+      "speaker": "{ACTOR_2}",
+      "text": "Did the trader from the capital pass through here yet?",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_INTRO_MOUNTAIN_GUARDS_AFTER_PASTURE_02",
+      "speaker": "Fighter Shank",
+      "text": "Arepas? Sure, she came past earlier this morning.\nWhy do you ask?",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_INTRO_MOUNTAIN_GUARDS_AFTER_PASTURE_03",
+      "speaker": "Knight Flambé",
+      "text": "I would have expected her in town well before now.",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_INTRO_MOUNTAIN_GUARDS_AFTER_PASTURE_04",
+      "speaker": "{ACTOR_4}",
+      "text": "...",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_INTRO_MOUNTAIN_GUARDS_AFTER_PASTURE_05",
+      "speaker": "Fighter Shank",
+      "text": "So she's pokier than usual. Big deal.",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_INTRO_MOUNTAIN_GUARDS_AFTER_PASTURE_06",
+      "speaker": "{ACTOR_1}",
+      "text": "Well, earlier on our patrol...",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_INTRO_MOUNTAIN_GUARDS_AFTER_PASTURE_06 (1)",
+      "speaker": "Knight Flambé",
+      "text": "Killed?! A shepherd and all the sheep?",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_INTRO_MOUNTAIN_GUARDS_AFTER_PASTURE_07",
+      "speaker": "Fighter Shank",
+      "text": "Holy hell...! By a bunch of hogs?\n...I got friends who are hogs...",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_INTRO_MOUNTAIN_GUARDS_AFTER_PASTURE_08",
+      "speaker": "Knight Flambé",
+      "text": "Find Arepas, and fast. If someone's hurt her,\nwe'll make sure they don't try to escape through here.",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_INTRO_MOUNTAIN_GUARDS_AFTER_PASTURE_09",
+      "speaker": "Fighter Shank",
+      "text": "You sure we can't go with them? I'd feel better\nbusting some skulls than just hanging\naround here.",
+      "actions": [
+        {
+          "type": "turn",
+          "params": [
+            "1+2",
+            "L"
+          ]
+        },
+        {
+          "type": "wait",
+          "params": [
+            "30"
+          ]
+        }
+      ]
+    },
+    {
+      "nodeId": "DLG_INTRO_MOUNTAIN_GUARDS_AFTER_PASTURE_10",
+      "speaker": "Knight Flambé",
+      "text": "We've got our job, they've got theirs.",
+      "actions": [
+        {
+          "type": "turn",
+          "params": [
+            "0",
+            "R"
+          ]
+        },
+        {
+          "type": "wait",
+          "params": [
+            "30"
+          ]
+        }
+      ]
+    },
+    {
+      "nodeId": "DLG_INTRO_MOUNTAIN_GUARDS_AFTER_PASTURE_11",
+      "speaker": "Fighter Shank",
+      "text": "Fine.",
+      "actions": [
+        {
+          "type": "turn",
+          "params": [
+            "1+2",
+            "D"
+          ]
+        },
+        {
+          "type": "wait",
+          "params": [
+            "30"
+          ]
+        }
+      ]
+    },
+    {
+      "nodeId": "DLG_INTRO_MOUNTAIN_GUARDS_AFTER_PASTURE_12",
+      "speaker": "Fighter Shank",
+      "text": "Give 'em hell from me, then.",
+      "actions": []
+    }
+  ],
+  "INTRO_MOUNTAIN_GUARDS_BEFORE_PASTURE_LAZY_GUARD_01": [
+    {
+      "nodeId": "DLG_INTRO_MOUNTAIN_GUARDS_BEFORE_PASTURE_LAZY_GUARD_01_01",
+      "speaker": "Fighter Shank",
+      "text": "Well, well, well. Look what the cat dragged in.",
+      "actions": []
+    }
+  ],
+  "INTRO_MOUNTAIN_GUARDS_BEFORE_PASTURE_CONT_GUARD_02": [
+    {
+      "nodeId": "DLG_INTRO_MOUNTAIN_GUARDS_BEFORE_PASTURE_CONT_GUARD_02",
+      "speaker": "Knight Flambé",
+      "text": "Blessings upon you, and good luck with the patrols.",
+      "actions": []
+    }
+  ],
+  "INTRO_MOUNTAIN_GUARDS_BEFORE_PASTURE_CONT_GUARD_01": [
+    {
+      "nodeId": "DLG_INTRO_MOUNTAIN_GUARDS_BEFORE_PASTURE_CONT_GUARD_01",
+      "speaker": "Fighter Shank",
+      "text": "...was only teasing...",
+      "actions": []
+    }
+  ],
+  "INTRO_MOUNTAIN_GUARDS_BEFORE_PASTURE_04": [
+    {
+      "nodeId": "DLG_INTRO_MOUNTAIN_GUARDS_BEFORE_PASTURE_08",
+      "speaker": "Knight Flambé",
+      "text": "Blessings upon you, and good luck with the patrols.",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_INTRO_MOUNTAIN_GUARDS_BEFORE_PASTURE_09",
+      "speaker": "Fighter Shank",
+      "text": "...was only teasing...",
+      "actions": []
+    }
+  ],
+  "INTRO_MOUNTAIN_GUARDS_BEFORE_PASTURE_03": [
+    {
+      "nodeId": "DLG_INTRO_MOUNTAIN_GUARDS_BEFORE_PASTURE_04",
+      "speaker": "Fighter Shank",
+      "text": "Well, yeah, 'course I—",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_INTRO_MOUNTAIN_GUARDS_BEFORE_PASTURE_05",
+      "speaker": "Knight Flambé",
+      "text": "And all we do is stand here and watch this mountain pass\nfor twelve hours a day?",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_INTRO_MOUNTAIN_GUARDS_BEFORE_PASTURE_06",
+      "speaker": "Fighter Shank",
+      "text": "Sure, but—",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_INTRO_MOUNTAIN_GUARDS_BEFORE_PASTURE_07",
+      "speaker": "Knight Flambé",
+      "text": "Then show some manners.",
+      "actions": []
+    }
+  ],
+  "INTRO_MOUNTAIN_GUARDS_BEFORE_PASTURE_02": [
+    {
+      "nodeId": "DLG_INTRO_MOUNTAIN_GUARDS_BEFORE_PASTURE_03",
+      "speaker": "Knight Flambé",
+      "text": "You know we're beadles, too, right?",
+      "actions": []
+    }
+  ],
+  "INTRO_MOUNTAIN_GUARDS_BEFORE_PASTURE_01": [
+    {
+      "nodeId": "DLG_INTRO_MOUNTAIN_GUARDS_BEFORE_PASTURE_01",
+      "speaker": "Knight Flambé",
+      "text": "All's well here.\nAren't you supposed to be patrolling the pastures?",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_INTRO_MOUNTAIN_GUARDS_BEFORE_PASTURE_02",
+      "speaker": "Fighter Shank",
+      "text": "Yeah, what if some slimes roll up to a sheep and\ngive it a big, goopy kiss? Har har!",
+      "actions": []
+    }
+  ],
+  "DLG_INTRO_SHEEP_DEAD": [
+    {
+      "nodeId": "DLG_INTRO_SHEEP_DEAD_01",
+      "speaker": "{ACTOR_1}",
+      "text": "Poor little fella...",
       "actions": []
     }
   ],
   "SHEPHERD_INTRO_NORTHWEST": [
+    {
+      "nodeId": "DLG_SHEPHERD_INTRO_NORTHWEST",
+      "speaker": "{ACTOR_1}",
+      "text": "Poor guy... Better let Brother Migas know abou this.",
+      "actions": []
+    },
     {
       "nodeId": "DLG_SHEPHERD_INTRO_NORTHWEST_01",
       "speaker": "{ACTOR_4}",
@@ -18,6 +270,194 @@
       "nodeId": "DLG_SHEPHERD_INTRO_NORTHWEST_02",
       "speaker": "{ACTOR_2}",
       "text": "Here they come!",
+      "actions": []
+    }
+  ],
+  "CARAVAN_TRADER_CORPSE": [
+    {
+      "nodeId": "DLG_CARAVAN_TRADER_CORPSE_01",
+      "speaker": "{ACTOR_1}",
+      "text": "Better report back to Brother Migas.\nMaybe he'll know what those creeps were talking about.",
+      "actions": []
+    }
+  ],
+  "CARAVAN_TRADER": [
+    {
+      "nodeId": "DLG_CARAVAN_TRADER_01",
+      "speaker": "{ACTOR_4}",
+      "text": "She's dead...",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_CARAVAN_TRADER_02",
+      "speaker": "{ACTOR_2}",
+      "text": "Poor Arepas... Who were those creeps, anyway?\nThink they're working with those hogs from before?",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_CARAVAN_TRADER_03",
+      "speaker": "{ACTOR_3}",
+      "text": "And what was all that about looking for God?",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_CARAVAN_TRADER_04",
+      "speaker": "{ACTOR_1}",
+      "text": "...",
+      "actions": []
+    },
+    {
+      "nodeId": "DLG_CARAVAN_TRADER_05",
+      "speaker": "{ACTOR_1}",
+      "text": "Better report back to Brother Migas.\nMaybe he'll know what they were talking about.",
+      "actions": []
+    }
+  ],
+  "CARAVAN_CARRION_EATERS_05": [
+    {
+      "nodeId": "DLG_CARAVAN_CARRION_EATERS_08",
+      "speaker": "",
+      "text": "She wouldn't tell us.\nWill you tell us?",
+      "actions": [],
+      "conditionSwitch": "001_MAIN_PASTURE_PATROL"
+    }
+  ],
+  "CARAVAN_CARRION_EATERS_04": [
+    {
+      "nodeId": "DLG_CARAVAN_CARRION_EATERS_07",
+      "speaker": "",
+      "text": "Take us to God.",
+      "actions": [],
+      "conditionSwitch": "001_MAIN_PASTURE_PATROL"
+    }
+  ],
+  "CARAVAN_CARRION_EATERS_03": [
+    {
+      "nodeId": "DLG_CARAVAN_CARRION_EATERS_06",
+      "speaker": "",
+      "text": "Where is God?",
+      "actions": [],
+      "conditionSwitch": "001_MAIN_PASTURE_PATROL"
+    }
+  ],
+  "CARAVAN_CARRION_EATERS_02": [
+    {
+      "nodeId": "DLG_CARAVAN_CARRION_EATERS_05",
+      "speaker": "",
+      "text": "Do you know where God is?",
+      "actions": [],
+      "conditionSwitch": "001_MAIN_PASTURE_PATROL"
+    }
+  ],
+  "CARAVAN_CARRION_EATERS_01": [
+    {
+      "nodeId": "DLG_CARAVAN_CARRION_EATERS_01",
+      "speaker": "{ACTOR_4}",
+      "text": "Not again...",
+      "actions": [],
+      "conditionSwitch": "001_MAIN_PASTURE_PATROL"
+    },
+    {
+      "nodeId": "DLG_CARAVAN_CARRION_EATERS_02",
+      "speaker": "{ACTOR_2}",
+      "text": "That's Arepas! Hey, you!\nStep away from her!",
+      "actions": [],
+      "conditionSwitch": "001_MAIN_PASTURE_PATROL"
+    },
+    {
+      "nodeId": "DLG_CARAVAN_CARRION_EATERS_03",
+      "speaker": "",
+      "text": "She's gone. But you needn't mourn her.",
+      "actions": [],
+      "conditionSwitch": "001_MAIN_PASTURE_PATROL"
+    },
+    {
+      "nodeId": "DLG_CARAVAN_CARRION_EATERS_04",
+      "speaker": "",
+      "text": "She's with God now. Or she would be, if we knew where\nyour God was.",
+      "actions": [],
+      "conditionSwitch": "001_MAIN_PASTURE_PATROL"
+    }
+  ],
+  "INTRO_QUEST_CLERIC_CARAVAN_CONT": [
+    {
+      "nodeId": "DLG_CARAVAN_QUEST_CLERIC_CONT_01",
+      "speaker": "Brother Migas",
+      "text": "Would you check in with the beadles stationed over at\nthe eastern mountain pass? Find out if they've seen her.",
+      "actions": [],
+      "conditionSwitch": "001_MAIN_PASTURE_PATROL"
+    }
+  ],
+  "INTRO_QUEST_CLERIC_CARAVAN": [
+    {
+      "nodeId": "DLG_CARAVAN_QUEST_CLERIC_01",
+      "speaker": "Brother Migas",
+      "text": "The beadles are back! Yipee.\nAnother triumphant patrol, I assume?",
+      "actions": [],
+      "conditionSwitch": "001_MAIN_PASTURE_PATROL"
+    },
+    {
+      "nodeId": "DLG_CARAVAN_QUEST_CLERIC_02",
+      "speaker": "",
+      "text": "{ACTOR_1} explains what happened in the forest pasture.",
+      "actions": [],
+      "conditionSwitch": "001_MAIN_PASTURE_PATROL"
+    },
+    {
+      "nodeId": "DLG_CARAVAN_QUEST_CLERIC_02",
+      "speaker": "{ACTOR_1}",
+      "text": "Unfortunately...",
+      "actions": [],
+      "conditionSwitch": "001_MAIN_PASTURE_PATROL"
+    },
+    {
+      "nodeId": "DLG_CARAVAN_QUEST_CLERIC_03",
+      "speaker": "Brother Migas",
+      "text": "That's... \nI'm sure you did all you could.",
+      "actions": [],
+      "conditionSwitch": "001_MAIN_PASTURE_PATROL"
+    },
+    {
+      "nodeId": "DLG_CARAVAN_QUEST_CLERIC_04",
+      "speaker": "Brother Migas",
+      "text": "I'll round up a few beadles to go give them a\nproper burial.",
+      "actions": [],
+      "conditionSwitch": "001_MAIN_PASTURE_PATROL"
+    },
+    {
+      "nodeId": "DLG_CARAVAN_QUEST_CLERIC_05",
+      "speaker": "Brother Migas",
+      "text": "In the meantime, we may have some more bad news.",
+      "actions": [],
+      "conditionSwitch": "001_MAIN_PASTURE_PATROL"
+    },
+    {
+      "nodeId": "DLG_CARAVAN_QUEST_CLERIC_06",
+      "speaker": "Brother Migas",
+      "text": "Arepas, the trader who drags herself all the way\nout to a backwater like Colcannon, is late.",
+      "actions": [],
+      "conditionSwitch": "001_MAIN_PASTURE_PATROL"
+    },
+    {
+      "nodeId": "DLG_CARAVAN_QUEST_CLERIC_07",
+      "speaker": "Brother Migas",
+      "text": "She should have been here a couple days ago at the latest.\nNormally, I'd chalk it up to a general lack of enthusiasm\nfor the deep, drawling, drooling countryside...",
+      "actions": [],
+      "conditionSwitch": "001_MAIN_PASTURE_PATROL"
+    },
+    {
+      "nodeId": "DLG_CARAVAN_QUEST_CLERIC_08",
+      "speaker": "Brother Migas",
+      "text": "...But what you've just witnessed has me worried.\nWould you check in with the beadles stationed over at\nthe eastern mountain pass? Find out if they've seen her.",
+      "actions": [],
+      "conditionSwitch": "001_MAIN_PASTURE_PATROL"
+    }
+  ],
+  "DLG_SHEEP": [
+    {
+      "nodeId": "DLG_SHEEP_01",
+      "speaker": "",
+      "text": "Baa.",
       "actions": []
     }
   ],
@@ -107,7 +547,7 @@
     {
       "nodeId": "DLG_SHEPHERD_INTRO_SOUTH_CONT_01",
       "speaker": "",
-      "text": "Same time tomorrow?",
+      "text": "If you're heading to the pasture in the forest clearing,\nhave a care. Those weird egg guys have been getting\nrowdier than usual.",
       "actions": []
     }
   ],
@@ -133,7 +573,7 @@
     {
       "nodeId": "DLG_SHEPHERD_INTRO_SOUTH_04",
       "speaker": "",
-      "text": "Same time tomorrow?",
+      "text": "If you're heading to the pasture in the forest clearing,\nhave a care. Those weird egg guys have been getting\nrowdier than usual.",
       "actions": []
     }
   ],
@@ -517,15 +957,6 @@
       "conditionSwitch": "001_MAIN_PASTURE_PATROL"
     }
   ],
-  "INTRO_QUEST_CLERIC_CARAVAN": [
-    {
-      "nodeId": "DLG_INTRO_QUEST_CLERIC_05",
-      "speaker": "Brother Migas",
-      "text": "Done with patrols? Good on you.",
-      "actions": [],
-      "conditionSwitch": "001_MAIN_PASTURE_PATROL"
-    }
-  ],
   "INTRO_QUEST_CLERIC_PATROL": [
     {
       "nodeId": "DLG_INTRO_QUEST_CLERIC_01",
@@ -536,7 +967,7 @@
     {
       "nodeId": "DLG_INTRO_QUEST_CLERIC_02",
       "speaker": "Brother Migas",
-      "text": "Daily patrols may not be glamorous,\nbut at least they're... Oh, Who am I\nfooling? They suck.",
+      "text": "Daily patrols may not be glamorous,\nbut at least they're... Oh, Who am I\nfooling? They're insufferable.",
       "actions": []
     },
     {
