@@ -19,8 +19,9 @@ const DATA_DIR = path.resolve(__dirname, '../../../../../data');
 // --- Asset Sync Paths ---
 const WORKING_DIR = "C:\\Users\\burr\\Desktop\\burr\\game design\\resources rpg";
 const MZ_DIR = "C:\\Users\\burr\\Documents\\RMMZ\\Empyrean Saga";
-const FOLDERS_TO_SYNC = ['audio', 'fonts', 'icon', 'img'];
-const VALID_EXTENSIONS = ['.png', '.ttf', '.ogg'];
+const STANDARD_FOLDERS_TO_SYNC = ['fonts', 'icon', 'img']; // Audio handled separately
+const VALID_EXTENSIONS = ['.png', '.ttf']; // .ogg handled separately
+const AUDIO_CATEGORIES = ['bgm', 'bgs', 'me', 'se']; // MZ's standard audio subfolders
 
 console.log("=========================================");
 console.log("🚀 Starting API-Driven Dialogue & Asset Pipeline...");
@@ -100,7 +101,6 @@ function syncAssets(src, dest, extensions) {
         const destPath = path.join(dest, entry.name);
 
         if (entry.isDirectory()) {
-            // Ensure destination subdirectory exists before traversing deeper
             if (!fs.existsSync(destPath)) {
                 fs.mkdirSync(destPath, { recursive: true });
             }
@@ -110,7 +110,6 @@ function syncAssets(src, dest, extensions) {
             if (extensions.includes(ext)) {
                 let shouldCopy = false;
                 
-                // Copy if it doesn't exist in destination, or if source is newer
                 if (!fs.existsSync(destPath)) {
                     shouldCopy = true;
                 } else {
@@ -129,6 +128,21 @@ function syncAssets(src, dest, extensions) {
         }
     }
     return copyCount;
+}
+
+// Helper to recursively find all files of a specific extension and flatten them
+function getFilesFlat(dir, extension, fileList = []) {
+    if (!fs.existsSync(dir)) return fileList;
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+            getFilesFlat(fullPath, extension, fileList);
+        } else if (entry.isFile() && path.extname(entry.name).toLowerCase() === extension) {
+            fileList.push(fullPath);
+        }
+    }
+    return fileList;
 }
 
 // --- Main Execution ---
@@ -189,10 +203,64 @@ function syncAssets(src, dest, extensions) {
         if (fs.existsSync(path.join(TOOLS_DIR, 'Dialogue.csv'))) fs.unlinkSync(path.join(TOOLS_DIR, 'Dialogue.csv'));
 
         // --- 6. Smart Asset Sync ---
-        console.log(`\n[6/6] Syncing updated assets (.png, .ttf, .ogg)...`);
+        console.log(`\n[6/6] Syncing updated assets...`);
         let totalCopied = 0;
-        
-        for (const folder of FOLDERS_TO_SYNC) {
+
+        // 6a. Audio (.ogg flat sync per audio category)
+        for (const category of AUDIO_CATEGORIES) {
+            const srcCategoryFolder = path.join(WORKING_DIR, 'audio', category);
+            const destCategoryFolder = path.join(MZ_DIR, 'audio', category);
+
+            if (fs.existsSync(srcCategoryFolder)) {
+                if (!fs.existsSync(destCategoryFolder)) {
+                    fs.mkdirSync(destCategoryFolder, { recursive: true });
+                }
+
+                const oggFiles = getFilesFlat(srcCategoryFolder, '.ogg');
+                const collisionMap = {}; 
+                let audioCopied = 0;
+
+                for (const srcPath of oggFiles) {
+                    const fileName = path.basename(srcPath);
+                    
+                    // Name Collision Check
+                    if (collisionMap[fileName]) {
+                        console.warn(`\x1b[33m      ⚠️ [WARNING] Name collision in /audio/${category} detected for "${fileName}"!\x1b[0m`);
+                        console.warn(`         -> File 1: ${collisionMap[fileName]}`);
+                        console.warn(`         -> File 2: ${srcPath}`);
+                        console.warn(`         -> Skipping File 2...`);
+                        continue;
+                    }
+                    
+                    collisionMap[fileName] = srcPath;
+                    const destPath = path.join(destCategoryFolder, fileName);
+                    let shouldCopy = false;
+                    
+                    if (!fs.existsSync(destPath)) {
+                        shouldCopy = true;
+                    } else {
+                        const srcStat = fs.statSync(srcPath);
+                        const destStat = fs.statSync(destPath);
+                        if (srcStat.mtime > destStat.mtime) {
+                            shouldCopy = true;
+                        }
+                    }
+
+                    if (shouldCopy) {
+                        fs.copyFileSync(srcPath, destPath);
+                        audioCopied++;
+                    }
+                }
+                
+                if (audioCopied > 0 || Object.keys(collisionMap).length > 0) {
+                     console.log(`      Synced ${audioCopied} .ogg file(s) flat into /audio/${category}`);
+                     totalCopied += audioCopied;
+                }
+            }
+        }
+
+        // 6b. Standard Folders (.png, .ttf hierarchical sync)
+        for (const folder of STANDARD_FOLDERS_TO_SYNC) {
             const srcFolder = path.join(WORKING_DIR, folder);
             const destFolder = path.join(MZ_DIR, folder);
             
