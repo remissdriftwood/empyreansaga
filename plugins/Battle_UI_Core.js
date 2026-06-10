@@ -1241,7 +1241,7 @@
         _Scene_Battle_onEnemyOk.call(this);
         if (this._skillWindow) this._skillWindow.hide();
         if (this._itemWindow) this._itemWindow.hide();
-        if (this._helpWindow) this._helpWindow.show();
+        if (this._helpWindow) this._helpWindow.hide();
     };
 
     //=============================================================================
