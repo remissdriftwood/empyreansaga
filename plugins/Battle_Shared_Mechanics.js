@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 4: Shared Battle Mechanics v1.3 (String Animations)
+ * @plugindesc Phase 4: Shared Battle Mechanics v1.2
  * @author Custom Build
  * * @help
  * Implements:
@@ -11,6 +11,14 @@
  * - Custom Skill Sort Order via <sort_order: x> tags.
  * - Random Element Strike (<random element>).
  * - Volatile Speed Coinflip (<volatile speed>).
+ * - FIX: Hooked Game_Action.clear() to wipe cached custom properties and prevent cross-turn pollution.
+ * - UPGRADE: Re-wrote Circle System hooks to queue async execution.
+ * - UPGRADE: Suppresses actor cast animations & skill banners during Circle End-of-Turn pulses.
+ * - UPGRADE: Migrated Fighter MP restoration math to UI payload callback for perfect HUD sync.
+ * - UPGRADE: Globally hosts addCircle. Supports "type" params for independent Orb tracking.
+ * - UPGRADE: Async Turn Queue natively supports Betraying Shards (State 43).
+ * - FIX: Appended '+' to custom MP restoration popups.
+ * - UPGRADE: Async Turn Queue natively supports Cultivator Sword on a String (State 60).
  */
 
 (() => {
@@ -27,16 +35,23 @@
         BETRAYING_SHARDS_SKILL_ID: 107,
         SWORD_STRING_STATE_ID: 60,
         
-        // --- NEW: Clueless Strike (String Based) ---
+        // --- NEW: Clueless Strike ---
         // Maps Element ID to specific Animation and SFX filenames
         RANDOM_ELEMENT_ANIMATIONS: {
-            2: { anim: "Anim_FireStrike", sfx: "SFX_FireHit" }, 
-            3: { anim: "Anim_IceStrike", sfx: "SFX_IceHit" },
-            4: { anim: "Anim_ThunderStrike", sfx: "SFX_ThunderHit" },
-            5: { anim: "Anim_WaterStrike", sfx: "SFX_WaterHit" }
+            3: { anim: "Fire1", sfx: "Skill - Fire" }, //Fire
+            4: { anim: "Ice1", sfx: "Skill - Ice" }, //Ice
+            5: { anim: "Thunder1", sfx: "Skill - Thunder" }, //Thunder
+            //6: { anim: "Anim_WaterStrike", sfx: "SFX_WaterHit" }, //Water
+            7: { anim: "Earth1", sfx: "Skill - Earth" }, //Earth
+            //8: { anim: "Anim_WaterStrike", sfx: "SFX_WaterHit" }, //Wind
+            //9: { anim: "Anim_WaterStrike", sfx: "SFX_WaterHit" }, //Holy
+            //10: { anim: "Anim_WaterStrike", sfx: "SFX_WaterHit" }, //Dark
+            11: { anim: "Metal1", sfx: "Skill - Metal" }, //Metal
+            12: { anim: "Wood1", sfx: "Skill - Wood" }, //Wood
         },
 
         // --- NEW: Poorly Balanced ---
+        // Defaults applied by the <volatile speed> tag
         VOLATILE_SPEED_HIGH: 500,
         VOLATILE_SPEED_LOW: -500
     };
@@ -102,8 +117,7 @@
         
         // Wipe custom mechanics caches
         this._rolledElementId = undefined;
-        this._rolledAnimString = undefined;
-        this._rolledSfxString = undefined;
+        this._rolledAnimationId = undefined;
         this._volatileSpeedMod = undefined;
     };
 
@@ -120,7 +134,7 @@
             return;
         }
 
-        // --- NEW: Random Element Cast Roll (String Caching) ---
+        // --- NEW: Random Element Cast Roll ---
         if (action.item() && action.item().note && action.item().note.match(/<random element>/i)) {
             if (action._rolledElementId === undefined) {
                 const elementKeys = Object.keys(CONFIG.RANDOM_ELEMENT_ANIMATIONS);
@@ -128,7 +142,7 @@
                     const randomKey = elementKeys[Math.floor(Math.random() * elementKeys.length)];
                     action._rolledElementId = parseInt(randomKey);
                     
-                    // Cache the specific strings to be intercepted by the visual plugin later
+                    // Cache the specific strings to be intercepted by the UI core later
                     action._rolledAnimString = CONFIG.RANDOM_ELEMENT_ANIMATIONS[randomKey].anim;
                     action._rolledSfxString = CONFIG.RANDOM_ELEMENT_ANIMATIONS[randomKey].sfx;
                 }
@@ -210,6 +224,20 @@
         return repeats;
     };
 
+    const _Game_Action_itemAnimationId = Game_Action.prototype.itemAnimationId;
+    Game_Action.prototype.itemAnimationId = function() {
+        // Intercept for Random Element animation override
+        if (this._rolledAnimationId) {
+            return this._rolledAnimationId;
+        }
+
+        const isTagged = this.item() && this.item().note && this.item().note.match(/<dual wield hits>/i);
+        if ((this.isAttack() || isTagged) && this._equipSlot === 1) {
+            return this.subject().attackAnimationId2();
+        }
+        return _Game_Action_itemAnimationId.call(this);
+    };
+
     // --- NEW: Element Rate Evaluation Intercept ---
     const _Game_Action_calcElementRate = Game_Action.prototype.calcElementRate;
     Game_Action.prototype.calcElementRate = function(target) {
@@ -228,6 +256,7 @@
     Game_Action.prototype.speed = function() {
         let speed = _Game_Action_speed.call(this);
         if (this.item() && this.item().note && this.item().note.match(/<volatile speed>/i)) {
+            // Cache the result so sorting algorithms don't shift turn order mid-calculation
             if (this._volatileSpeedMod === undefined) {
                 const isFast = Math.random() < 0.5;
                 this._volatileSpeedMod = isFast ? CONFIG.VOLATILE_SPEED_HIGH : CONFIG.VOLATILE_SPEED_LOW;

@@ -722,6 +722,7 @@
     const _Window_BattleLog_startAction = Window_BattleLog.prototype.startAction;
     Window_BattleLog.prototype.startAction = function(subject, action, targets) {
         this._currentActionItem = action.item(); 
+        this._currentAction = action;
         _Window_BattleLog_startAction.call(this, subject, action, targets);
     };
 
@@ -912,38 +913,52 @@
     const _Window_BattleLog_showAnimation = Window_BattleLog.prototype.showAnimation;
     Window_BattleLog.prototype.showAnimation = function(subject, targets, animationId) {
         const item = this._currentActionItem;
+        const action = this._currentAction; // Retrieve the cached action
         
-        if (item && item.meta && item.meta.Anim) {
+        let animName = null;
+        let soundName = null;
+        let scope = "target";
+
+        // 1. PRIORITY: Check if the action rolled a Random Element string
+        if (action && action._rolledAnimString) {
+            animName = action._rolledAnimString;
+            soundName = action._rolledSfxString; // Can be null/undefined
+            // Scope defaults to "target" for elemental strikes
+        } 
+        // 2. FALLBACK: Check standard <Anim: > notetag
+        else if (item && item.meta && item.meta.Anim) {
             const tagData = item.meta.Anim.split(",");
-            const animName = String(tagData[0]).trim();
-            const soundName = tagData.length > 1 ? String(tagData[1]).trim() : null;
-            const scope = tagData.length > 2 ? String(tagData[2]).trim().toLowerCase() : "target";
+            animName = String(tagData[0]).trim();
+            soundName = tagData.length > 1 ? String(tagData[1]).trim() : null;
+            scope = tagData.length > 2 ? String(tagData[2]).trim().toLowerCase() : "target";
+        }
+
+        // 3. Execute the Retro Animation
+        if (animName && this._spriteset) {
+            let soundPlayed = false;
             
-            if (this._spriteset) {
-                let soundPlayed = false;
-                
-                if (scope === "screen") {
-                    const animSprite = new Sprite_RetroAnim("screen", animName);
-                    this._spriteset.addChild(animSprite);
-                    this._spriteset._retroAnimations.push(animSprite);
-                    if (soundName) AudioManager.playSe({ name: soundName, volume: 90, pitch: 100, pan: 0 });
-                } else {
-                    targets.forEach(target => {
-                        const targetSprite = this._spriteset.findTargetSprite(target);
-                        if (targetSprite && targetSprite.parent) {
-                            const animSprite = new Sprite_RetroAnim(targetSprite, animName);
-                            targetSprite.parent.addChild(animSprite);
-                            this._spriteset._retroAnimations.push(animSprite);
-                            
-                            if (soundName && !soundPlayed) {
-                                AudioManager.playSe({ name: soundName, volume: 90, pitch: 100, pan: 0 });
-                                soundPlayed = true; 
-                            }
+            if (scope === "screen") {
+                const animSprite = new Sprite_RetroAnim("screen", animName);
+                this._spriteset.addChild(animSprite);
+                this._spriteset._retroAnimations.push(animSprite);
+                if (soundName) AudioManager.playSe({ name: soundName, volume: 90, pitch: 100, pan: 0 });
+            } else {
+                targets.forEach(target => {
+                    const targetSprite = this._spriteset.findTargetSprite(target);
+                    if (targetSprite && targetSprite.parent) {
+                        const animSprite = new Sprite_RetroAnim(targetSprite, animName);
+                        targetSprite.parent.addChild(animSprite);
+                        this._spriteset._retroAnimations.push(animSprite);
+                        
+                        if (soundName && !soundPlayed) {
+                            AudioManager.playSe({ name: soundName, volume: 90, pitch: 100, pan: 0 });
+                            soundPlayed = true; 
                         }
-                    });
-                }
+                    }
+                });
             }
         } else {
+            // Standard MZ Animation Fallback
             _Window_BattleLog_showAnimation.call(this, subject, targets, animationId);
         }
     };
