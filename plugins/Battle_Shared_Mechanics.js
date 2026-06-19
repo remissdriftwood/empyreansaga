@@ -19,6 +19,7 @@
  * - UPGRADE: Async Turn Queue natively supports Betraying Shards (State 43).
  * - FIX: Appended '+' to custom MP restoration popups.
  * - UPGRADE: Async Turn Queue natively supports Cultivator Sword on a String (State 60).
+ * - UPGRADE: Added special behavior to prevent a character from dual wielding two handed weapons. Use note tag <two handed> in weapon database
  */
 
 (() => {
@@ -466,6 +467,38 @@
                 return (a.id || 0) - (b.id || 0); 
             });
         }
+    };
+
+    //=============================================================================
+    // 7. Two-Handed Dual Wield Restriction (Flexible Hands)
+    //=============================================================================
+
+    const _Game_Actor_changeEquip = Game_Actor.prototype.changeEquip;
+    Game_Actor.prototype.changeEquip = function(slotId, item) {
+        if (item && DataManager.isWeapon(item)) {
+            const isTwoHanded = item.note.match(/<two handed>/i);
+            
+            // Determine the "other" hand (Slot 0 is Main, Slot 1 is Off-hand)
+            const otherSlotId = slotId === 0 ? 1 : (slotId === 1 ? 0 : -1);
+            
+            if (otherSlotId !== -1) {
+                // RULE 1: If equipping a 2H weapon, force the other hand to be empty
+                if (isTwoHanded) {
+                    this.forceChangeEquip(otherSlotId, null);
+                } 
+                // RULE 2: If equipping a 1H weapon, check if the other hand is holding a 2H weapon
+                else {
+                    const otherItem = this.equips()[otherSlotId];
+                    if (otherItem && otherItem.note.match(/<two handed>/i)) {
+                        // Unequip the 2H weapon to make room for this 1H weapon
+                        this.forceChangeEquip(otherSlotId, null);
+                    }
+                }
+            }
+        }
+        
+        // Proceed with the normal equip function
+        _Game_Actor_changeEquip.call(this, slotId, item);
     };
 
 })();
