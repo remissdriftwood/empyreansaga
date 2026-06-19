@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 4: Shared Battle Mechanics v1.15
+ * @plugindesc Phase 4: Shared Battle Mechanics v1.3 (String Animations)
  * @author Custom Build
  * * @help
  * Implements:
@@ -9,14 +9,8 @@
  * - Action Sequencing (<random repeats: X-Y>, <random extra hit: Z>, <follow up X: Y%>).
  * - Fighter MP Regen (Restores 1 MP per successful normal/dual-wield hit).
  * - Custom Skill Sort Order via <sort_order: x> tags.
- * - FIX: Hooked Game_Action.clear() to wipe cached custom properties and prevent cross-turn pollution.
- * - UPGRADE: Re-wrote Circle System hooks to queue async execution.
- * - UPGRADE: Suppresses actor cast animations & skill banners during Circle End-of-Turn pulses.
- * - UPGRADE: Migrated Fighter MP restoration math to UI payload callback for perfect HUD sync.
- * - UPGRADE: Globally hosts addCircle. Supports "type" params for independent Orb tracking.
- * - UPGRADE: Async Turn Queue natively supports Betraying Shards (State 43).
- * - FIX: Appended '+' to custom MP restoration popups.
- * - UPGRADE: Async Turn Queue natively supports Cultivator Sword on a String (State 60).
+ * - Random Element Strike (<random element>).
+ * - Volatile Speed Coinflip (<volatile speed>).
  */
 
 (() => {
@@ -31,7 +25,20 @@
         DUAL_WIELD_PENALTY: 0.75,
         BETRAYING_SHARDS_STATE_ID: 43,
         BETRAYING_SHARDS_SKILL_ID: 107,
-        SWORD_STRING_STATE_ID: 60 
+        SWORD_STRING_STATE_ID: 60,
+        
+        // --- NEW: Clueless Strike (String Based) ---
+        // Maps Element ID to specific Animation and SFX filenames
+        RANDOM_ELEMENT_ANIMATIONS: {
+            2: { anim: "Anim_FireStrike", sfx: "SFX_FireHit" }, 
+            3: { anim: "Anim_IceStrike", sfx: "SFX_IceHit" },
+            4: { anim: "Anim_ThunderStrike", sfx: "SFX_ThunderHit" },
+            5: { anim: "Anim_WaterStrike", sfx: "SFX_WaterHit" }
+        },
+
+        // --- NEW: Poorly Balanced ---
+        VOLATILE_SPEED_HIGH: 500,
+        VOLATILE_SPEED_LOW: -500
     };
 
     //=============================================================================
@@ -92,10 +99,16 @@
         this._extraHitMod = undefined;
         this._isFollowUp = undefined;
         this._isCirclePulse = undefined;
+        
+        // Wipe custom mechanics caches
+        this._rolledElementId = undefined;
+        this._rolledAnimString = undefined;
+        this._rolledSfxString = undefined;
+        this._volatileSpeedMod = undefined;
     };
 
     //=============================================================================
-    // 3. Action Sequencer (Volley Split, Reloads, and Ammo Consumption)
+    // 3. Action Sequencer & Cast Intercepts
     //=============================================================================
     const _BattleManager_startAction = BattleManager.startAction;
     BattleManager.startAction = function() {
@@ -105,6 +118,21 @@
         if (!action) {
             _BattleManager_startAction.call(this);
             return;
+        }
+
+        // --- NEW: Random Element Cast Roll (String Caching) ---
+        if (action.item() && action.item().note && action.item().note.match(/<random element>/i)) {
+            if (action._rolledElementId === undefined) {
+                const elementKeys = Object.keys(CONFIG.RANDOM_ELEMENT_ANIMATIONS);
+                if (elementKeys.length > 0) {
+                    const randomKey = elementKeys[Math.floor(Math.random() * elementKeys.length)];
+                    action._rolledElementId = parseInt(randomKey);
+                    
+                    // Cache the specific strings to be intercepted by the visual plugin later
+                    action._rolledAnimString = CONFIG.RANDOM_ELEMENT_ANIMATIONS[randomKey].anim;
+                    action._rolledSfxString = CONFIG.RANDOM_ELEMENT_ANIMATIONS[randomKey].sfx;
+                }
+            }
         }
 
         const isNormalAttack = action.isAttack();
@@ -182,13 +210,31 @@
         return repeats;
     };
 
-    const _Game_Action_itemAnimationId = Game_Action.prototype.itemAnimationId;
-    Game_Action.prototype.itemAnimationId = function() {
-        const isTagged = this.item() && this.item().note && this.item().note.match(/<dual wield hits>/i);
-        if ((this.isAttack() || isTagged) && this._equipSlot === 1) {
-            return this.subject().attackAnimationId2();
+    // --- NEW: Element Rate Evaluation Intercept ---
+    const _Game_Action_calcElementRate = Game_Action.prototype.calcElementRate;
+    Game_Action.prototype.calcElementRate = function(target) {
+        if (this._rolledElementId) {
+            if (this._rolledElementId < 0) {
+                return this.elementsMaxRate(target, this.subject().attackElements());
+            } else {
+                return target.elementRate(this._rolledElementId);
+            }
         }
-        return _Game_Action_itemAnimationId.call(this);
+        return _Game_Action_calcElementRate.call(this, target);
+    };
+
+    // --- NEW: Volatile Speed System ---
+    const _Game_Action_speed = Game_Action.prototype.speed;
+    Game_Action.prototype.speed = function() {
+        let speed = _Game_Action_speed.call(this);
+        if (this.item() && this.item().note && this.item().note.match(/<volatile speed>/i)) {
+            if (this._volatileSpeedMod === undefined) {
+                const isFast = Math.random() < 0.5;
+                this._volatileSpeedMod = isFast ? CONFIG.VOLATILE_SPEED_HIGH : CONFIG.VOLATILE_SPEED_LOW;
+            }
+            speed += this._volatileSpeedMod;
+        }
+        return speed;
     };
 
     const _Game_Action_apply = Game_Action.prototype.apply;
