@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc Phase 5: Martyr Class Mechanics v1.3
+ * @plugindesc Phase 5: Martyr Class Mechanics v1.4
  * @author Custom Build
  * * @help
  * Implements:
@@ -12,7 +12,7 @@
  * - Gout of Flame (Skill 111 / State 65): Auto-Battle channel that locks on to
  * a target, bypasses MP checks, and increments a damage multiplier each turn.
  * - MP Restore on Death: Instantly restores 100% MP upon dying with UI sync.
- * - FIX: Appended a 60-frame delay to the death popup to avoid HP damage visual overlap.
+ * - Death Skills: Martyrs learn specific skills permanently based on total deaths.
  */
 
 (() => {
@@ -40,7 +40,18 @@
         
         GOUT_OF_FLAME_SKILL_ID: 111,
         GOUT_OF_FLAME_STATE_ID: 65,
-        GOUT_MAX_MULTIPLIER: 20
+        GOUT_MAX_MULTIPLIER: 20,
+
+        // --- NEW: Martyr Death Skill Thresholds ---
+        // Format -> Number of Deaths: [Array of Skill IDs to Learn]
+        DEATH_SKILLS: {
+            1: [111],
+            5: [100, 103],
+            10: [106],
+            15: [108],
+            20: [109]
+            25: [99]
+        }
     };
 
     //=============================================================================
@@ -235,26 +246,84 @@
     };
 
     //=============================================================================
-    // 6. MP Restore on Death (Martyr Core Mechanic)
+    // 6. Death Tracking, Skill Learning & MP Restore (Martyr Core Mechanic)
     //=============================================================================
     
     const _Game_Actor_die = Game_Actor.prototype.die;
     Game_Actor.prototype.die = function() {
         _Game_Actor_die.call(this);
         
+        // 1. Universally increment total deaths regardless of current class
+        this._totalDeaths = (this._totalDeaths || 0) + 1;
+        
         // Execute exactly as the death state is applied
         if (this._classId === CONFIG.MARTYR_CLASS_ID) {
-            const restored = this.mmp - this.mp;
             
+            // 2. Check for Death Threshold Skills
+            for (const thresholdStr in CONFIG.DEATH_SKILLS) {
+                const threshold = Number(thresholdStr);
+                
+                // Because we use >=, we ensure they catch up on any skills they 
+                // "missed" if they accrued deaths while they were not a Martyr
+                if (this._totalDeaths >= threshold) {
+                    const skills = CONFIG.DEATH_SKILLS[thresholdStr];
+                    skills.forEach(skillId => {
+                        if (!this.isLearnedSkill(skillId)) {
+                            this.learnSkill(skillId);
+                            
+                            if ($gameParty.inBattle()) {
+                                // Queue the message for end of battle
+                                this._pendingMartyrSkills = this._pendingMartyrSkills || [];
+                                this._pendingMartyrSkills.push(skillId);
+                            } else {
+                                // Instantly pop a message if they die from hazard damage on the map
+                                const skillName = $dataSkills[skillId] ? $dataSkills[skillId].name : "a new skill";
+                                $gameMessage.add(`${this.name()} embraced martyrdom and learned ${skillName}!`);
+                            }
+                        }
+                    });
+                }
+            }
+
+            // 3. MP Restore on Death
+            const restored = this.mmp - this.mp;
             if (restored > 0) {
                 // UI Sync Payload Callback ensures the HUD doesn't instantly jump 
                 // until the popup text visually drops over the dying sprite.
-                // Added a 60-frame delay so the lethal damage popup clears first.
                 this.requestCustomTextPopup("+" + this.mmp, "heal", () => {
                     this.setMp(this.mmp);
                 }, 60);
             }
         }
+    };
+
+    // Clear pending skills if a battle ends early (e.g., party escapes)
+    const _Game_Actor_onBattleEnd = Game_Actor.prototype.onBattleEnd;
+    Game_Actor.prototype.onBattleEnd = function() {
+        _Game_Actor_onBattleEnd.call(this);
+        this._pendingMartyrSkills = [];
+    };
+
+    //=============================================================================
+    // 7. Post-Battle Reward Notifications
+    //=============================================================================
+    
+    const _BattleManager_displayRewards = BattleManager.displayRewards;
+    BattleManager.displayRewards = function() {
+        _BattleManager_displayRewards.call(this);
+        
+        // Inject our learning popups directly into the battle rewards queue.
+        // This ensures they appear natively after EXP/Gold and Level Ups, 
+        // but prior to the custom Mimic sequence being handled.
+        $gameParty.members().forEach(actor => {
+            if (actor._pendingMartyrSkills && actor._pendingMartyrSkills.length > 0) {
+                actor._pendingMartyrSkills.forEach(skillId => {
+                    const skillName = $dataSkills[skillId] ? $dataSkills[skillId].name : "a new skill";
+                    $gameMessage.add(`${actor.name()} learned ${skillName}!`);
+                });
+                actor._pendingMartyrSkills = []; // Flush the queue
+            }
+        });
     };
 
 })();
