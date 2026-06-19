@@ -49,7 +49,7 @@
             5: [100, 103],
             10: [106],
             15: [108],
-            20: [109]
+            20: [109],
             25: [99]
         }
     };
@@ -308,13 +308,8 @@
     // 7. Post-Battle Reward Notifications
     //=============================================================================
     
-    const _BattleManager_displayRewards = BattleManager.displayRewards;
-    BattleManager.displayRewards = function() {
-        _BattleManager_displayRewards.call(this);
-        
-        // Inject our learning popups directly into the battle rewards queue.
-        // This ensures they appear natively after EXP/Gold and Level Ups, 
-        // but prior to the custom Mimic sequence being handled.
+    // Centralized function to display pending skills and clear the queue
+    const flushMartyrSkills = () => {
         $gameParty.members().forEach(actor => {
             if (actor._pendingMartyrSkills && actor._pendingMartyrSkills.length > 0) {
                 actor._pendingMartyrSkills.forEach(skillId => {
@@ -324,6 +319,29 @@
                 actor._pendingMartyrSkills = []; // Flush the queue
             }
         });
+    };
+
+    // Hook 1: Standard Victory (Fires after EXP/Gold, before Mimic hook)
+    const _BattleManager_displayRewards = BattleManager.displayRewards;
+    BattleManager.displayRewards = function() {
+        _BattleManager_displayRewards.call(this);
+        flushMartyrSkills();
+    };
+
+    // Hook 2: Escape Success (Fires directly after the "Party Escaped" text)
+    const _BattleManager_displayEscapeSuccessMessage = BattleManager.displayEscapeSuccessMessage;
+    BattleManager.displayEscapeSuccessMessage = function() {
+        _BattleManager_displayEscapeSuccessMessage.call(this);
+        flushMartyrSkills();
+    };
+
+    // Hook 3: Catch-All for Aborts / "Continue on Defeat" events
+    const _BattleManager_endBattle = BattleManager.endBattle;
+    BattleManager.endBattle = function(result) {
+        if (result !== 0) { // 0 is Victory, which is already handled above
+            flushMartyrSkills();
+        }
+        _BattleManager_endBattle.call(this, result);
     };
 
 })();
