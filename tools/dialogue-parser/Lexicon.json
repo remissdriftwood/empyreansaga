@@ -1,0 +1,258 @@
+{
+  "UI_SKILL_TEACHER_LEARNED": {
+    "name": "LEARNED",
+    "description": ""
+  },
+  "UI_SKILL_TEACHER_TRAINING": {
+    "name": " training",
+    "description": ""
+  },
+  "UI_COMMANDS_NO": {
+    "name": "NO",
+    "description": ""
+  },
+  "UI_COMMANDS_YES": {
+    "name": "YES",
+    "description": ""
+  },
+  "UI_COMMANDS_CANCEL": {
+    "name": "CANCEL",
+    "description": ""
+  },
+  "UI_COMMANDS_TITLE": {
+    "name": "TO TITLE",
+    "description": ""
+  },
+  "UI_COMMANDS_CONTINUE": {
+    "name": "CONTINUE",
+    "description": ""
+  },
+  "UI_COMMANDS_NEWGAME": {
+    "name": "NEW GAME",
+    "description": ""
+  },
+  "UI_COMMANDS_SELL": {
+    "name": "SELL",
+    "description": ""
+  },
+  "UI_COMMANDS_BUY": {
+    "name": "BUY",
+    "description": ""
+  },
+  "UI_COMMANDS_CLEAR": {
+    "name": "CLEAR",
+    "description": ""
+  },
+  "UI_COMMANDS_OPTIMIZE": {
+    "name": "OPTIMIZE",
+    "description": ""
+  },
+  "UI_COMMANDS_EQUIP2": {
+    "name": "EQUIP",
+    "description": ""
+  },
+  "UI_COMMANDS_KEYITEM": {
+    "name": "KEY ITEM",
+    "description": ""
+  },
+  "UI_COMMANDS_ARMOR": {
+    "name": "ARMOR",
+    "description": ""
+  },
+  "UI_COMMANDS_WEAPON": {
+    "name": "WEAPON",
+    "description": ""
+  },
+  "UI_COMMANDS_GAMEOVER": {
+    "name": "GAME OVER",
+    "description": ""
+  },
+  "UI_COMMANDS_SAVE": {
+    "name": "SAVE",
+    "description": ""
+  },
+  "UI_COMMANDS_OPTIONS": {
+    "name": "OPTIONS",
+    "description": ""
+  },
+  "UI_COMMANDS_FORMATION": {
+    "name": "FORMATION",
+    "description": ""
+  },
+  "UI_COMMANDS_STATUS": {
+    "name": "STATUS",
+    "description": ""
+  },
+  "UI_COMMANDS_EQUIP": {
+    "name": "EQUIP",
+    "description": ""
+  },
+  "UI_COMMANDS_SKILL": {
+    "name": "SKILL",
+    "description": ""
+  },
+  "UI_COMMANDS_ITEM": {
+    "name": "ITEM",
+    "description": ""
+  },
+  "UI_COMMANDS_GUARD": {
+    "name": "GUARD",
+    "description": ""
+  },
+  "UI_COMMANDS_ATTACK": {
+    "name": "ATTACK",
+    "description": ""
+  },
+  "UI_COMMANDS_ESCAPE": {
+    "name": "ESCAPE",
+    "description": ""
+  },
+  "UI_COMMANDS_FIGHT": {
+    "name": "FIGHT",
+    "description": ""
+  },
+  "UI_STATS_EXP_ABBR": {
+    "name": "EXP",
+    "description": ""
+  },
+  "UI_STATS_EXP": {
+    "name": "EXP",
+    "description": ""
+  },
+  "UI_STATS_TP_ABBR": {
+    "name": "TP",
+    "description": ""
+  },
+  "UI_STATS_TP": {
+    "name": "TP",
+    "description": ""
+  },
+  "UI_STATS_MP_ABBR": {
+    "name": "MP",
+    "description": ""
+  },
+  "UI_STATS_MP": {
+    "name": "MP",
+    "description": ""
+  },
+  "UI_STATS_HP_ABBR": {
+    "name": "HP",
+    "description": ""
+  },
+  "UI_STATS_HP": {
+    "name": "HP",
+    "description": ""
+  },
+  "UI_STATS_LEVEL_ABBR": {
+    "name": "LV",
+    "description": ""
+  },
+  "UI_STATS_LEVEL": {
+    "name": "LEVEL",
+    "description": ""
+  },
+  "UI_STATS_EVA": {
+    "name": "EVADE",
+    "description": ""
+  },
+  "UI_STATS_HIT": {
+    "name": "HIT RATE",
+    "description": ""
+  },
+  "UI_STATS_LUK": {
+    "name": "LUCK",
+    "description": ""
+  },
+  "UI_STATS_AGI": {
+    "name": "AGILITY",
+    "description": ""
+  },
+  "UI_STATS_MDF": {
+    "name": "M. DEFENSE",
+    "description": ""
+  },
+  "UI_STATS_MAT": {
+    "name": "MAGIC",
+    "description": ""
+  },
+  "UI_STATS_DEF": {
+    "name": "DEFENSE",
+    "description": ""
+  },
+  "UI_STATS_ATK": {
+    "name": "ATTACK",
+    "description": ""
+  },
+  "UI_STATS_MMP": {
+    "name": "MAX MP",
+    "description": ""
+  },
+  "UI_STATS_MHP": {
+    "name": "MAX HP",
+    "description": ""
+  },
+  "UI_CHARCREATE_MIMIC_FRIENDLY_DESC": {
+    "name": "Some characters you meet outside of battle\\nare happy to let you transform into them.",
+    "description": ""
+  },
+  "UI_CHARCREATE_MIMIC_SKILLS_DESC": {
+    "name": "Transform into a monster to gain their skills,\\ntraits, strengths and weaknesses.\\nThe Mimic's stats will be influenced as well.",
+    "description": ""
+  },
+  "UI_CHARCREATE_LEARNMORE": {
+    "name": "Learn more",
+    "description": ""
+  },
+  "UI_CHARCREATE_TITLE": {
+    "name": "Choose a beadles (Shift key to learn more)",
+    "description": ""
+  },
+  "UI_CHARCREATE_MIMIC_FRIENDLY": {
+    "name": "FRIENDLY MIMICRY",
+    "description": ""
+  },
+  "UI_CHARCREATE_MIMIC_SKILLS": {
+    "name": "MIMIC SKILLS",
+    "description": ""
+  },
+  "UI_CHARCREATE_MP": {
+    "name": "MP RESTORATION",
+    "description": ""
+  },
+  "UI_SEEDS_NONE": {
+    "name": "No seeds planted",
+    "description": ""
+  },
+  "UI_ELEMENT_EARTH": {
+    "name": "Earth",
+    "description": ""
+  },
+  "UI_ELEMENT_METAL": {
+    "name": "Metal",
+    "description": ""
+  },
+  "UI_ELEMENT_WOOD": {
+    "name": "Wood",
+    "description": ""
+  },
+  "UI_ELEMENT_WATER": {
+    "name": "Water",
+    "description": ""
+  },
+  "UI_ELEMENT_FIRE": {
+    "name": "Fire",
+    "description": ""
+  },
+  "UI_ELEMENT_NONE": {
+    "name": "No element",
+    "description": ""
+  },
+  "UI_BATTLE_MISS": {
+    "name": "MISS",
+    "description": ""
+  },
+  "UI_BATTLE_CRIT": {
+    "name": "CRIT!",
+    "description": ""
+  }
+}

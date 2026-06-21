@@ -3,7 +3,7 @@ const { Client } = require('@notionhq/client');
 const fs = require('fs');
 const path = require('path');
 
-const notion = new Client({ auth: process.env.NOTION_API_KEY });
+const notion = new Client({ auth: process.env.NOTION_TOKEN });
 const LEXICON_DB_ID = process.env.NOTION_LEXICON_DB_ID;
 
 async function buildLexicon() {
@@ -27,19 +27,34 @@ async function buildLexicon() {
     results.forEach(page => {
         const props = page.properties;
         
-        const id = props['ID']?.title[0]?.plain_text;
+        // 1. Auto-detect the ID column (Notion databases only have one 'title' type column)
+        const idKey = Object.keys(props).find(key => props[key].type === 'title');
+        const id = idKey ? props[idKey].title.map(t => t.plain_text).join('').trim() : null;
         if (!id) return;
 
-        const getRichText = (prop) => prop?.rich_text.map(t => t.plain_text).join('') || "";
+        // 2. Robust text extractor that ignores case sensitivity and trailing spaces
+        const getSafeText = (targetName) => {
+            const actualKey = Object.keys(props).find(k => k.trim().toLowerCase() === targetName.toLowerCase());
+            if (!actualKey) return ""; // Column not found
+            
+            const prop = props[actualKey];
+            if (prop && prop.type === 'rich_text') {
+                return prop.rich_text.map(t => t.plain_text).join('');
+            }
+            if (prop && prop.type === 'title') {
+                return prop.title.map(t => t.plain_text).join('');
+            }
+            return ""; // Fallback if column type is something unexpected
+        };
 
-        // Extracts only Name and Description. Notes are ignored.
+        // 3. Map properties safely
         lexicon[id] = {
-            name: getRichText(props['Display Name']),
-            description: getRichText(props['Display Description'])
+            name: getSafeText('Display Name'),
+            description: getSafeText('Display Description')
         };
     });
 
-    const outputPath = path.join(__dirname, '..', '..', 'data', 'Lexicon.json');
+    const outputPath = path.join(__dirname, 'Lexicon.json');
     fs.writeFileSync(outputPath, JSON.stringify(lexicon, null, 2));
     
     console.log(`Successfully generated Lexicon.json with ${Object.keys(lexicon).length} entries.`);

@@ -361,7 +361,7 @@
         this.contents.clear();
         // Dynamically pull the class name from the DB, default to generic "Class" if invalid
         const className = (this._classId && $dataClasses[this._classId]) ? $dataClasses[this._classId].name : "Class";
-        this.drawText(className + " Training", 0, 0, this.innerWidth, "left");
+        this.drawText(className + GetLexiconText("UI_SKILL_TEACHER_TRAINING", " TRAINING"), 0, 0, this.innerWidth, "left");
     };
 
     // =========================================================================
@@ -430,7 +430,7 @@
 
         if (this.isPurchased(item)) {
             // Matches item max restriction visuals
-            this.drawText("Learned", rect.x + rect.width - priceWidth, rect.y, priceWidth, "right");
+            this.drawText(GetLexiconText("UI_SKILL_TEACHER_LEARNED", "LEARNED"), rect.x + rect.width - priceWidth, rect.y, priceWidth, "right");
         } else {
             // Draw Gold Price
             this.drawText(this.price(item), rect.x + rect.width - priceWidth, rect.y, priceWidth, "right");
