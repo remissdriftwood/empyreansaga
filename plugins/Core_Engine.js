@@ -436,12 +436,12 @@
             const lh = this.lineHeight();
             
             this.changeTextColor(ColorManager.systemColor());
-            this.drawText("Current " + TextManager.exp, 0, 0, 160);
+            this.drawText(GetLexiconText("UI_STATUS_EXP_CURRENT", "Current ") + TextManager.exp, 0, 0, 160);
             this.resetTextColor();
             this.drawText(this._actor.currentExp(), 0, 0, this.innerWidth, "right");
             
             this.changeTextColor(ColorManager.systemColor());
-            this.drawText("To Next LV", 0, lh, 160);
+            this.drawText(GetLexiconText("UI_STATUS_EXP_TONEXT", "To next level "), 0, lh, 160);
             this.resetTextColor();
             
             let nextExp = "-------";
